@@ -1,4 +1,4 @@
-// SpeakWise - In-Page Direct UI Interactive Coach (Word & Full Sentence Support)
+// SpeakWise - In-Page Direct UI Coach for Vietnamese Learners
 (() => {
   let activeTooltip = null;
   let activeSidePanel = null;
@@ -20,7 +20,7 @@
     selectionPill.id = 'speakwise-selection-pill';
     selectionPill.innerHTML = `
       <span class="sp-pill-icon">🎙️</span>
-      <span class="sp-pill-text">SpeakWise</span>
+      <span class="sp-pill-text">SpeakWise Tra & Luyện</span>
     `;
     selectionPill.style.display = 'none';
     document.documentElement.appendChild(selectionPill);
@@ -46,14 +46,13 @@
       const sel = window.getSelection();
       const text = sel ? sel.toString().trim() : '';
 
-      // Allow words and long sentences (up to 500 characters)
       if (text && text.length > 1 && text.length <= 500) {
         try {
           const range = sel.getRangeAt(0);
           const rect = range.getBoundingClientRect();
           if (rect.width > 0 && rect.height > 0) {
             selectionPill.style.top = `${window.scrollY + rect.top - 40}px`;
-            selectionPill.style.left = `${window.scrollX + rect.left + (rect.width / 2) - 45}px`;
+            selectionPill.style.left = `${window.scrollX + rect.left + (rect.width / 2) - 55}px`;
             selectionPill.style.display = 'inline-flex';
             return;
           }
@@ -70,36 +69,66 @@
   }
 
   /* -------------------------------------------------------------
-     2. Translation Helper API (Free Google Translate Endpoint)
+     2. Rich Vietnamese Translation & Dictionary API
   ------------------------------------------------------------- */
-  async function translateText(text, targetLang = 'vi') {
+  async function fetchVietnameseTranslation(text) {
     try {
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+      // dt=t (translation), dt=bd (dictionary pos & meanings for single words)
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=bd&dt=rm&q=${encodeURIComponent(text)}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error('Translation failed');
+      if (!res.ok) throw new Error('API Error');
       const data = await res.json();
-      
-      let translated = '';
+
+      let primaryTranslation = '';
       if (data && data[0]) {
         data[0].forEach(item => {
-          if (item && item[0]) translated += item[0];
+          if (item && item[0]) primaryTranslation += item[0];
         });
       }
-      return translated || 'Không dịch được đoạn văn này.';
-    } catch (err) {
-      return 'Lỗi dịch thuật mạng hoặc không phản hồi.';
+
+      // Detailed dictionary definitions for Vietnamese
+      const dictEntries = [];
+      if (data && data[1]) {
+        data[1].forEach(posGroup => {
+          const posName = posGroup[0]; // 'noun', 'verb', 'adjective'
+          const viMeanings = posGroup[1] || []; // list of vietnamese words
+          const detailed = [];
+          if (posGroup[2]) {
+            posGroup[2].forEach(sub => {
+              detailed.push({
+                word: sub[0],
+                synonyms: sub[1] || []
+              });
+            });
+          }
+          dictEntries.push({
+            pos: posName,
+            meanings: viMeanings,
+            details: detailed
+          });
+        });
+      }
+
+      return {
+        translation: primaryTranslation.trim() || 'Chưa có bản dịch.',
+        dictEntries: dictEntries
+      };
+    } catch (e) {
+      return {
+        translation: 'Lỗi nạp bản dịch tiếng Việt.',
+        dictEntries: []
+      };
     }
   }
 
   /* -------------------------------------------------------------
-     3. Inline Floating Tooltip (Sentence & Word)
+     3. Inline Floating Tooltip (Hiển thị nghĩa Tiếng Việt trực quan)
   ------------------------------------------------------------- */
   function showInlineTooltip(rawText, targetRect) {
     removeInlineTooltip();
     const cleanText = rawText.trim();
     currentTargetText = cleanText;
 
-    // Detect if this is a sentence or single word
     const wordsCount = cleanText.split(/\s+/).length;
     isSentenceMode = wordsCount > 2 || cleanText.includes('.') || cleanText.includes('?') || cleanText.includes('!');
 
@@ -110,7 +139,7 @@
     }
 
     const topPos = window.scrollY + targetRect.bottom + 10;
-    const leftPos = Math.max(10, Math.min(window.innerWidth - (isSentenceMode ? 420 : 340), window.scrollX + targetRect.left - 20));
+    const leftPos = Math.max(10, Math.min(window.innerWidth - (isSentenceMode ? 430 : 360), window.scrollX + targetRect.left - 20));
 
     activeTooltip.style.top = `${topPos}px`;
     activeTooltip.style.left = `${leftPos}px`;
@@ -123,31 +152,37 @@
             ${!isSentenceMode ? `<span class="sp-target-word">${cleanText}</span><span class="sp-ipa" id="sp-tip-ipa">...</span>` : ''}
           </div>
           <div class="sp-header-actions">
-            <button class="sp-btn-icon" id="sp-tip-expand-btn" title="Mở Panel chi tiết">⤢</button>
+            <button class="sp-btn-icon" id="sp-tip-expand-btn" title="Mở Panel bên phải">⤢</button>
             <button class="sp-btn-icon" id="sp-tip-close-btn" title="Đóng">&times;</button>
           </div>
         </div>
 
         ${isSentenceMode ? `<div class="sp-sentence-original">“${cleanText}”</div>` : ''}
 
-        <!-- Translation Block -->
-        <div class="sp-translation-box" id="sp-tip-translation-box">
-          <div class="sp-trans-label">🇻🇳 Dịch nghĩa:</div>
-          <div class="sp-trans-result" id="sp-tip-trans-text"><div class="sp-loading-spinner"></div></div>
+        <!-- Nghĩa Tiếng Việt Nổi Bật -->
+        <div class="sp-vn-meaning-box">
+          <div class="sp-vn-label">
+            <span>🇻🇳 <strong>Nghĩa Tiếng Việt:</strong></span>
+          </div>
+          <div class="sp-vn-primary" id="sp-tip-vn-primary">
+            <div class="sp-loading-spinner"></div>
+          </div>
+          <div class="sp-vn-sub-meanings" id="sp-tip-vn-subs" style="display:none;"></div>
         </div>
 
+        <!-- Điều khiển âm thanh -->
         <div class="sp-audio-actions">
           <button class="sp-pill-btn" id="sp-tip-audio-norm">🔊 Nghe đọc</button>
           <button class="sp-pill-btn slow" id="sp-tip-audio-slow">🐢 Chậm 0.6x</button>
-          <button class="sp-pill-btn star" id="sp-tip-save-btn">⭐ Lưu</button>
+          <button class="sp-pill-btn star" id="sp-tip-save-btn">⭐ Lưu từ</button>
         </div>
 
-        <!-- Speaking Practice for the sentence/word -->
+        <!-- Luyện phát âm / Chấm điểm -->
         <div class="sp-voice-test-box">
           <div class="sp-voice-row">
             <button class="sp-mic-pill" id="sp-tip-mic-btn">
               <span class="sp-mic-icon">🎤</span>
-              <span class="sp-mic-label">${isSentenceMode ? 'Đọc luyện câu này' : 'Bấm để nói'}</span>
+              <span class="sp-mic-label">${isSentenceMode ? 'Đọc luyện câu' : 'Luyện phát âm'}</span>
             </button>
             <div class="sp-score-container" id="sp-tip-score-box" style="display:none;">
               <span class="sp-score-badge" id="sp-tip-score-badge">0%</span>
@@ -157,7 +192,7 @@
           <div class="sp-heard-text" id="sp-tip-heard-text"></div>
         </div>
 
-        <!-- Detailed dictionary definition if single word -->
+        <!-- Ví dụ Anh - Việt (nếu là từ vựng) -->
         ${!isSentenceMode ? `
         <div class="sp-definition-box" id="sp-tip-def-box">
           <div class="sp-loading-spinner"></div>
@@ -178,15 +213,26 @@
     document.getElementById('sp-tip-mic-btn').addEventListener('click', () => toggleSpeechTest('tip'));
     document.getElementById('sp-tip-save-btn').addEventListener('click', (e) => saveWordToNotebook(e.target));
 
-    // Handle translation
-    translateText(cleanText, 'vi').then(trans => {
-      const transEl = document.getElementById('sp-tip-trans-text');
-      if (transEl) transEl.textContent = trans;
+    // Nạp nghĩa tiếng Việt chi tiết
+    fetchVietnameseTranslation(cleanText).then(res => {
+      const primaryEl = document.getElementById('sp-tip-vn-primary');
+      const subsEl = document.getElementById('sp-tip-vn-subs');
+      if (primaryEl) primaryEl.textContent = res.translation;
+
+      if (!isSentenceMode && res.dictEntries && res.dictEntries.length > 0) {
+        subsEl.style.display = 'block';
+        let html = '';
+        res.dictEntries.slice(0, 2).forEach(item => {
+          const posMap = { noun: 'Danh từ', verb: 'Động từ', adjective: 'Tính từ', adverb: 'Trạng từ' };
+          const posTitle = posMap[item.pos] || item.pos;
+          html += `<div class="sp-vn-pos-line"><span class="sp-vn-pos-badge">${posTitle}</span> ${item.meanings.slice(0, 4).join(', ')}</div>`;
+        });
+        subsEl.innerHTML = html;
+      }
     });
 
-    // If single word, fetch phonetic & definitions
     if (!isSentenceMode) {
-      fetchWordData(cleanText, 'tip');
+      fetchEnglishExtras(cleanText, 'tip');
     }
   }
 
@@ -199,7 +245,7 @@
   }
 
   /* -------------------------------------------------------------
-     4. Interactive Side Panel (Word & Sentence Translation)
+     4. Interactive Side Panel với Nghĩa Tiếng Việt Đầy Đủ
   ------------------------------------------------------------- */
   function openSidePanel(text) {
     if (!activeSidePanel) {
@@ -209,7 +255,7 @@
         <div class="sp-panel-header">
           <div class="sp-panel-title">
             <span class="sp-panel-logo">🎙️</span>
-            <strong>SpeakWise Translator & Coach</strong>
+            <strong>SpeakWise Trợ Lý Tiếng Việt</strong>
           </div>
           <div class="sp-panel-controls">
             <button class="sp-panel-btn" id="sp-panel-pin-btn" title="Ghim thanh bên">📌</button>
@@ -218,37 +264,38 @@
         </div>
 
         <div class="sp-panel-search">
-          <textarea id="sp-panel-input" rows="2" placeholder="Nhập từ, cụm từ hoặc cả câu văn tiếng Anh..."></textarea>
-          <button id="sp-panel-search-btn">Dịch & Luyện</button>
+          <textarea id="sp-panel-input" rows="2" placeholder="Nhập từ, cụm từ hoặc cả câu tiếng Anh cần tra..."></textarea>
+          <button id="sp-panel-search-btn">Tra Nghĩa & Luyện Đọc</button>
         </div>
 
         <div class="sp-panel-body" id="sp-panel-body">
           <div class="sp-panel-word-head">
-            <div class="sp-type-indicator" id="sp-panel-type-tag">Từ / Câu văn</div>
+            <div class="sp-type-indicator" id="sp-panel-type-tag">Từ vựng</div>
             <h2 id="sp-panel-word">...</h2>
             <div class="sp-panel-ipa-row">
               <span class="sp-ipa" id="sp-panel-ipa" style="display:none;">/.../</span>
               <button class="sp-pill-btn" id="sp-panel-audio-norm">🔊 Nghe đọc</button>
               <button class="sp-pill-btn slow" id="sp-panel-audio-slow">🐢 Chậm 0.6x</button>
-              <button class="sp-pill-btn star" id="sp-panel-save-btn">⭐ Lưu</button>
+              <button class="sp-pill-btn star" id="sp-panel-save-btn">⭐ Lưu lại</button>
             </div>
           </div>
 
-          <!-- Sentence Translation Result -->
-          <div class="sp-panel-translation-card">
-            <div class="sp-card-title">🇻🇳 Bản dịch tiếng Việt</div>
-            <div class="sp-card-body-text" id="sp-panel-trans-result">Đang dịch...</div>
+          <!-- Nghĩa Tiếng Việt Panel -->
+          <div class="sp-panel-vn-card">
+            <div class="sp-vn-header-label">🇻🇳 <strong>Ý NGHĨA TIẾNG VIỆT</strong></div>
+            <div class="sp-vn-main-translation" id="sp-panel-vn-trans">Đang dịch...</div>
+            <div id="sp-panel-vn-details" class="sp-vn-details-group"></div>
           </div>
 
-          <!-- Realtime speaking trainer for sentences -->
+          <!-- Luyện giọng đọc -->
           <div class="sp-panel-trainer">
             <div class="sp-trainer-header">
-              <strong>🗣️ Luyện phát âm / Đọc câu & Chấm điểm</strong>
+              <strong>🗣️ Luyện phát âm & Chấm điểm tức thì</strong>
             </div>
             <div class="sp-voice-row">
               <button class="sp-mic-pill" id="sp-panel-mic-btn">
                 <span class="sp-mic-icon">🎤</span>
-                <span class="sp-mic-label">Bắt đầu đọc</span>
+                <span class="sp-mic-label">Bấm để nói</span>
               </button>
               <div class="sp-score-container" id="sp-panel-score-box" style="display:none;">
                 <span class="sp-score-badge" id="sp-panel-score-badge">0%</span>
@@ -258,10 +305,10 @@
             <div class="sp-heard-text" id="sp-panel-heard-text"></div>
           </div>
 
-          <!-- Word-specific details (Definitions, Examples, Synonyms) -->
+          <!-- Ví dụ ngữ cảnh Anh - Anh bổ sung -->
           <div id="sp-panel-word-extras" style="display:none;">
             <div class="sp-panel-section">
-              <h4 class="sp-section-title">Định nghĩa & Ví dụ thực tế</h4>
+              <h4 class="sp-section-title">Ví dụ minh họa & Định nghĩa Anh ngữ</h4>
               <div id="sp-panel-definitions" class="sp-definitions-list"></div>
             </div>
 
@@ -331,11 +378,28 @@
 
     document.getElementById('sp-panel-type-tag').textContent = isSentence ? '📄 Câu văn' : '📖 Từ vựng';
     document.getElementById('sp-panel-word').textContent = cleanText;
-    document.getElementById('sp-panel-trans-result').textContent = 'Đang dịch...';
+    document.getElementById('sp-panel-vn-trans').textContent = 'Đang tra nghĩa...';
+    document.getElementById('sp-panel-vn-details').innerHTML = '';
 
-    // Translate sentence/word
-    translateText(cleanText, 'vi').then(trans => {
-      document.getElementById('sp-panel-trans-result').textContent = trans;
+    // Lấy nghĩa tiếng Việt
+    fetchVietnameseTranslation(cleanText).then(res => {
+      document.getElementById('sp-panel-vn-trans').textContent = res.translation;
+
+      const detailsContainer = document.getElementById('sp-panel-vn-details');
+      if (res.dictEntries && res.dictEntries.length > 0) {
+        let detailsHtml = '';
+        res.dictEntries.forEach(item => {
+          const posMap = { noun: 'Danh từ', verb: 'Động từ', adjective: 'Tính từ', adverb: 'Trạng từ' };
+          const posTitle = posMap[item.pos] || item.pos;
+          detailsHtml += `
+            <div class="sp-vn-detail-row">
+              <span class="sp-vn-pos-badge">${posTitle}</span>
+              <span class="sp-vn-meanings-text">${item.meanings.join(', ')}</span>
+            </div>
+          `;
+        });
+        detailsContainer.innerHTML = detailsHtml;
+      }
     });
 
     const extras = document.getElementById('sp-panel-word-extras');
@@ -344,7 +408,7 @@
     if (!isSentence) {
       ipaEl.style.display = 'inline-block';
       extras.style.display = 'block';
-      fetchWordData(cleanText.replace(/[^a-zA-Z\s'-]/g, ''), 'panel');
+      fetchEnglishExtras(cleanText.replace(/[^a-zA-Z\s'-]/g, ''), 'panel');
     } else {
       ipaEl.style.display = 'none';
       extras.style.display = 'none';
@@ -353,14 +417,14 @@
   }
 
   /* -------------------------------------------------------------
-     5. Data Fetching for Single Words
+     5. Phonetics & English Details
   ------------------------------------------------------------- */
   let currentFetchedEntry = null;
 
-  async function fetchWordData(word, mode) {
+  async function fetchEnglishExtras(word, mode) {
     try {
       const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-      if (!res.ok) throw new Error('Không tìm thấy từ');
+      if (!res.ok) throw new Error('Not found');
       const data = await res.json();
       currentFetchedEntry = data[0];
 
@@ -383,7 +447,7 @@
           const m = currentFetchedEntry.meanings[0];
           const d = m.definitions[0];
           defBox.innerHTML = `
-            <div class="sp-pos-label">${m.partOfSpeech}</div>
+            <div class="sp-pos-label">Context (Anh - Anh)</div>
             <div class="sp-def-text">${d.definition}</div>
             ${d.example ? `<div class="sp-def-example">“${d.example}”</div>` : ''}
           `;
@@ -395,7 +459,7 @@
         defsContainer.innerHTML = '';
         const allSynonyms = new Set();
 
-        currentFetchedEntry.meanings.slice(0, 3).forEach(m => {
+        currentFetchedEntry.meanings.slice(0, 2).forEach(m => {
           const wrap = document.createElement('div');
           wrap.className = 'sp-panel-def-group';
           let defsListHtml = '';
@@ -441,7 +505,7 @@
   }
 
   /* -------------------------------------------------------------
-     6. Audio & Text-to-Speech Engine
+     6. Audio & Speech
   ------------------------------------------------------------- */
   function playPronunciation(text, rate = 1.0) {
     if (currentAudioUrl && text.split(/\s+/).length <= 2) {
@@ -464,7 +528,7 @@
   }
 
   /* -------------------------------------------------------------
-     7. Voice Recognition & Sentence Speaking Scoring
+     7. Voice Scoring
   ------------------------------------------------------------- */
   function toggleSpeechTest(uiMode) {
     const btn = uiMode === 'tip' ? document.getElementById('sp-tip-mic-btn') : document.getElementById('sp-panel-mic-btn');
@@ -476,7 +540,7 @@
     }
 
     if (!SpeechRecognition) {
-      alert('Trình duyệt chưa bật hỗ trợ Speech Recognition. Hãy dùng Google Chrome hoặc Microsoft Edge.');
+      alert('Trình duyệt chưa hỗ trợ Web Speech API.');
       return;
     }
 
@@ -486,7 +550,7 @@
 
     btn.classList.add('recording');
     const label = btn.querySelector('.sp-mic-label');
-    if (label) label.textContent = 'Đang lắng nghe câu bạn đọc...';
+    if (label) label.textContent = 'Đang nghe... (Nói tiếng Anh)';
 
     recognition.onresult = (e) => {
       const spoken = e.results[0][0].transcript.toLowerCase().trim();
@@ -531,7 +595,6 @@
     scoreBox.style.display = 'flex';
     heardBox.innerHTML = `Bạn vừa đọc: "<strong>${spoken}</strong>"`;
 
-    // Clean punctuation
     const cleanTarget = target.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
     const cleanSpoken = spoken.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
 
@@ -541,13 +604,13 @@
 
     if (scorePct >= 85) {
       scoreBadge.classList.add('perfect');
-      scoreMsg.textContent = '🌟 Rất lưu loát & chính xác!';
+      scoreMsg.textContent = '🌟 Rất xuất sắc & chuẩn bản xứ!';
     } else if (scorePct >= 60) {
       scoreBadge.classList.add('good');
-      scoreMsg.textContent = '👍 Tốt! Rõ ràng và dễ hiểu.';
+      scoreMsg.textContent = '👍 Rõ ràng, người bản ngữ hiểu tốt.';
     } else {
       scoreBadge.classList.add('retry');
-      scoreMsg.textContent = '💡 Hãy bấm nút 🐢 Chậm để nghe nhịp câu.';
+      scoreMsg.textContent = '💡 Hãy bấm nút 🐢 Chậm để nghe kỹ âm.';
     }
   }
 
@@ -568,11 +631,11 @@
   }
 
   /* -------------------------------------------------------------
-     8. Save Sentence or Word to Vocabulary Notebook
+     8. Save to Vocabulary Notebook
   ------------------------------------------------------------- */
   function saveWordToNotebook(btnEl) {
-    const meaning = document.getElementById('sp-tip-trans-text')?.textContent || 
-                    document.getElementById('sp-panel-trans-result')?.textContent || '';
+    const meaning = document.getElementById('sp-tip-vn-primary')?.textContent || 
+                    document.getElementById('sp-panel-vn-trans')?.textContent || '';
     
     const payload = {
       word: currentTargetText,
@@ -585,13 +648,13 @@
     chrome.runtime.sendMessage({ action: "save_word", data: payload }, () => {
       btnEl.textContent = '✅ Đã lưu';
       setTimeout(() => {
-        btnEl.textContent = '⭐ Lưu';
+        btnEl.textContent = '⭐ Lưu từ';
       }, 1800);
     });
   }
 
   /* -------------------------------------------------------------
-     9. Handle Messages from Background
+     9. Messages from Background
   ------------------------------------------------------------- */
   chrome.runtime.onMessage.addListener((req) => {
     if (req.action === "open_modal" && req.text) {

@@ -1,4 +1,4 @@
-// Popup Logic (Word & Sentence Translation)
+// Popup Logic (Dedicated Vietnamese Meaning Support)
 let currentText = '';
 let currentAudio = null;
 let recognition = null;
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Clear all
   document.getElementById('clear-all-btn').addEventListener('click', () => {
-    if (confirm('Xóa toàn bộ từ và câu đã lưu?')) {
+    if (confirm('Xóa toàn bộ từ và câu đã lưu trong sổ?')) {
       chrome.storage.local.set({ savedWords: [] }, () => {
         renderSavedWords();
         updateWordCount();
@@ -57,24 +57,42 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   updateWordCount();
-  processInput('Consistency is the key to success.');
+  processInput('fluency');
 });
 
-async function translateText(text) {
+async function fetchVietnameseMeaning(text) {
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=vi&dt=t&q=${encodeURIComponent(text)}`;
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=bd&q=${encodeURIComponent(text)}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('Translation failed');
+    if (!res.ok) throw new Error('API Error');
     const data = await res.json();
-    let translated = '';
+
+    let primary = '';
     if (data && data[0]) {
       data[0].forEach(item => {
-        if (item && item[0]) translated += item[0];
+        if (item && item[0]) primary += item[0];
       });
     }
-    return translated || 'Không có bản dịch.';
+
+    const dictList = [];
+    if (data && data[1]) {
+      data[1].forEach(posGroup => {
+        dictList.push({
+          pos: posGroup[0],
+          meanings: posGroup[1] || []
+        });
+      });
+    }
+
+    return {
+      primary: primary.trim() || 'Chưa rõ nghĩa.',
+      dictList: dictList
+    };
   } catch (e) {
-    return 'Lỗi dịch mạng.';
+    return {
+      primary: 'Không thể kết nối dịch nghĩa.',
+      dictList: []
+    };
   }
 }
 
@@ -90,14 +108,22 @@ async function processInput(text) {
 
   scoreBox.style.display = 'none';
   transcriptBox.textContent = '';
-  resultCard.style.display = 'block';
+  resultCard.style.display = 'flex';
 
   document.getElementById('result-word').textContent = text;
-  transEl.textContent = 'Đang dịch...';
+  transEl.textContent = 'Đang tra cứu nghĩa Tiếng Việt...';
 
-  // Translate
-  translateText(text).then(trans => {
-    transEl.textContent = trans;
+  // Lấy nghĩa tiếng Việt
+  fetchVietnameseMeaning(text).then(res => {
+    let html = `<div style="font-weight: 700; font-size: 15px; color: #713f12; margin-bottom: 4px;">${res.primary}</div>`;
+    if (res.dictList && res.dictList.length > 0) {
+      const posMap = { noun: 'Danh từ', verb: 'Động từ', adjective: 'Tính từ', adverb: 'Trạng từ' };
+      res.dictList.forEach(d => {
+        const viPos = posMap[d.pos] || d.pos;
+        html += `<div style="font-size: 12px; margin-top: 3px;"><strong style="color: #9a3412;">[${viPos}]</strong> ${d.meanings.slice(0, 4).join(', ')}</div>`;
+      });
+    }
+    transEl.innerHTML = html;
   });
 
   const words = text.split(/\s+/).length;
@@ -277,7 +303,7 @@ function toggleSaveWord() {
         word: text,
         phonetic: document.getElementById('result-ipa').textContent,
         audioUrl: currentAudio,
-        meaning: document.getElementById('result-translation').textContent,
+        meaning: document.getElementById('result-translation').innerText,
         createdAt: Date.now()
       };
       list.unshift(item);
@@ -314,7 +340,7 @@ function renderSavedWords() {
       card.innerHTML = `
         <div class="saved-info">
           <strong>${item.word}</strong>
-          <div class="trans">${item.meaning || ''}</div>
+          <div class="trans">${item.meaning ? item.meaning.replace(/\n/g, ' - ') : ''}</div>
         </div>
         <div class="saved-actions">
           <button class="icon-btn play-saved-btn" title="Nghe đọc">🔊</button>

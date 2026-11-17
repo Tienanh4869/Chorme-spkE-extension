@@ -1,7 +1,8 @@
-// Popup Logic
-let currentWord = null;
+// Popup Logic (Word & Sentence Translation)
+let currentText = '';
 let currentAudio = null;
 let recognition = null;
+let isSentence = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,16 +22,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Search
+  // Search / Translate
   document.getElementById('quick-search-btn').addEventListener('click', () => {
-    const word = document.getElementById('quick-input').value.trim();
-    if (word) lookupWord(word);
+    const text = document.getElementById('quick-input').value.trim();
+    if (text) processInput(text);
   });
 
   document.getElementById('quick-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const word = e.target.value.trim();
-      if (word) lookupWord(word);
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const text = e.target.value.trim();
+      if (text) processInput(text);
     }
   });
 
@@ -46,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Clear all
   document.getElementById('clear-all-btn').addEventListener('click', () => {
-    if (confirm('Clear all saved vocabulary words?')) {
+    if (confirm('Xóa toàn bộ từ và câu đã lưu?')) {
       chrome.storage.local.set({ savedWords: [] }, () => {
         renderSavedWords();
         updateWordCount();
@@ -55,28 +57,73 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   updateWordCount();
-  // Default load an interesting example if empty
-  lookupWord('eloquent');
+  processInput('Consistency is the key to success.');
 });
 
-async function lookupWord(word) {
+async function translateText(text) {
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=vi&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Translation failed');
+    const data = await res.json();
+    let translated = '';
+    if (data && data[0]) {
+      data[0].forEach(item => {
+        if (item && item[0]) translated += item[0];
+      });
+    }
+    return translated || 'Không có bản dịch.';
+  } catch (e) {
+    return 'Lỗi dịch mạng.';
+  }
+}
+
+async function processInput(text) {
+  currentText = text;
   const resultCard = document.getElementById('quick-result');
   const scoreBox = document.getElementById('score-indicator');
   const transcriptBox = document.getElementById('spoken-transcript');
+  const defContainer = document.getElementById('result-definition-container');
+  const ipaEl = document.getElementById('result-ipa');
+  const typeEl = document.getElementById('result-type');
+  const transEl = document.getElementById('result-translation');
 
   scoreBox.style.display = 'none';
   transcriptBox.textContent = '';
+  resultCard.style.display = 'block';
 
+  document.getElementById('result-word').textContent = text;
+  transEl.textContent = 'Đang dịch...';
+
+  // Translate
+  translateText(text).then(trans => {
+    transEl.textContent = trans;
+  });
+
+  const words = text.split(/\s+/).length;
+  isSentence = words > 2 || text.includes('.') || text.includes('?') || text.includes('!');
+
+  if (isSentence) {
+    typeEl.textContent = '📄 Câu văn';
+    ipaEl.style.display = 'none';
+    defContainer.style.display = 'none';
+    currentAudio = null;
+  } else {
+    typeEl.textContent = '📖 Từ vựng';
+    ipaEl.style.display = 'inline-block';
+    defContainer.style.display = 'block';
+    lookupDictionaryWord(text.replace(/[^a-zA-Z\s'-]/g, ''));
+  }
+
+  checkIfSaved(text);
+}
+
+async function lookupDictionaryWord(word) {
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
     if (!res.ok) throw new Error('Not found');
     const data = await res.json();
     const entry = data[0];
-
-    currentWord = entry;
-    resultCard.style.display = 'block';
-
-    document.getElementById('result-word').textContent = entry.word;
 
     let ipa = entry.phonetic || '';
     currentAudio = null;
@@ -93,20 +140,18 @@ async function lookupWord(word) {
       document.getElementById('result-definition').textContent = def.definition;
       document.getElementById('result-example').textContent = def.example ? `"${def.example}"` : '';
     }
-
-    checkIfSaved(entry.word);
   } catch (e) {
-    alert(`Could not find details for "${word}".`);
+    document.getElementById('result-definition-container').style.display = 'none';
   }
 }
 
 function playAudio(rate = 1.0) {
-  if (currentAudio) {
+  if (currentAudio && !isSentence) {
     const audio = new Audio(currentAudio);
     audio.playbackRate = rate;
-    audio.play().catch(() => speakTTS(currentWord.word, rate));
-  } else if (currentWord) {
-    speakTTS(currentWord.word, rate);
+    audio.play().catch(() => speakTTS(currentText, rate));
+  } else {
+    speakTTS(currentText, rate);
   }
 }
 
@@ -125,12 +170,12 @@ function toggleSpeech() {
   if (recognition && micBtn.classList.contains('recording')) {
     recognition.stop();
     micBtn.classList.remove('recording');
-    micBtn.textContent = '🎙️ Speak Now';
+    micBtn.textContent = '🎙️ Bấm để nói';
     return;
   }
 
   if (!SpeechRecognition) {
-    alert('Speech recognition is not supported in this browser version.');
+    alert('Trình duyệt chưa hỗ trợ Web Speech API.');
     return;
   }
 
@@ -139,7 +184,7 @@ function toggleSpeech() {
   recognition.interimResults = false;
 
   micBtn.classList.add('recording');
-  micBtn.textContent = '🔴 Listening...';
+  micBtn.textContent = '🔴 Đang nghe...';
 
   recognition.onresult = (e) => {
     const spoken = e.results[0][0].transcript.toLowerCase().trim();
@@ -148,43 +193,44 @@ function toggleSpeech() {
 
   recognition.onend = () => {
     micBtn.classList.remove('recording');
-    micBtn.textContent = '🎙️ Speak Now';
+    micBtn.textContent = '🎙️ Bấm để nói';
   };
 
   recognition.onerror = () => {
     micBtn.classList.remove('recording');
-    micBtn.textContent = '🎙️ Speak Now';
+    micBtn.textContent = '🎙️ Bấm để nói';
   };
 
   recognition.start();
 }
 
 function evaluateSpeech(spoken) {
-  if (!currentWord) return;
-  const target = currentWord.word.toLowerCase();
   const transcriptBox = document.getElementById('spoken-transcript');
   const scoreBox = document.getElementById('score-indicator');
   const scoreVal = document.getElementById('score-val');
   const scoreMsg = document.getElementById('score-msg');
 
   scoreBox.style.display = 'flex';
-  transcriptBox.innerHTML = `Heard: "<strong>${spoken}</strong>"`;
+  transcriptBox.innerHTML = `Đã nghe: "<strong>${spoken}</strong>"`;
 
-  const sim = getSimilarity(target, spoken);
+  const cleanTarget = currentText.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
+  const cleanSpoken = spoken.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
+
+  const sim = getSimilarity(cleanTarget, cleanSpoken);
   const pct = Math.round(sim * 100);
 
   scoreVal.textContent = `${pct}%`;
   scoreVal.className = 'score-pill';
 
-  if (pct >= 90) {
+  if (pct >= 85) {
     scoreVal.classList.add('excellent');
-    scoreMsg.textContent = '🌟 Native!';
-  } else if (pct >= 65) {
+    scoreMsg.textContent = '🌟 Rất lưu loát!';
+  } else if (pct >= 60) {
     scoreVal.classList.add('good');
-    scoreMsg.textContent = '👍 Clear!';
+    scoreMsg.textContent = '👍 Khá chuẩn!';
   } else {
     scoreVal.classList.add('needs-work');
-    scoreMsg.textContent = '💡 Try Slow';
+    scoreMsg.textContent = '💡 Thử nghe lại';
   }
 }
 
@@ -204,10 +250,10 @@ function getSimilarity(s1, s2) {
   return Math.max(0, (max - m[l1][l2]) / max);
 }
 
-function checkIfSaved(word) {
+function checkIfSaved(text) {
   const saveBtn = document.getElementById('quick-save-btn');
   chrome.storage.local.get({ savedWords: [] }, (res) => {
-    const isSaved = res.savedWords.some(w => w.word.toLowerCase() === word.toLowerCase());
+    const isSaved = res.savedWords.some(w => w.word.toLowerCase() === text.toLowerCase());
     if (isSaved) {
       saveBtn.classList.add('saved');
     } else {
@@ -217,22 +263,21 @@ function checkIfSaved(word) {
 }
 
 function toggleSaveWord() {
-  if (!currentWord) return;
   const saveBtn = document.getElementById('quick-save-btn');
-  const word = currentWord.word;
+  const text = currentText;
 
   chrome.storage.local.get({ savedWords: [] }, (res) => {
     let list = res.savedWords;
-    const idx = list.findIndex(w => w.word.toLowerCase() === word.toLowerCase());
+    const idx = list.findIndex(w => w.word.toLowerCase() === text.toLowerCase());
     if (idx >= 0) {
       list.splice(idx, 1);
       saveBtn.classList.remove('saved');
     } else {
       const item = {
-        word: word,
+        word: text,
         phonetic: document.getElementById('result-ipa').textContent,
         audioUrl: currentAudio,
-        meaning: document.getElementById('result-definition').textContent,
+        meaning: document.getElementById('result-translation').textContent,
         createdAt: Date.now()
       };
       list.unshift(item);
@@ -246,7 +291,7 @@ function toggleSaveWord() {
 
 function updateWordCount() {
   chrome.storage.local.get({ savedWords: [] }, (res) => {
-    document.getElementById('stats-badge').textContent = `${res.savedWords.length} words`;
+    document.getElementById('stats-badge').textContent = `${res.savedWords.length} mục`;
   });
 }
 
@@ -269,11 +314,11 @@ function renderSavedWords() {
       card.innerHTML = `
         <div class="saved-info">
           <strong>${item.word}</strong>
-          <span class="ipa">${item.phonetic || ''}</span>
+          <div class="trans">${item.meaning || ''}</div>
         </div>
         <div class="saved-actions">
-          <button class="icon-btn play-saved-btn" title="Listen">🔊</button>
-          <button class="icon-btn remove-saved-btn" title="Remove">🗑️</button>
+          <button class="icon-btn play-saved-btn" title="Nghe đọc">🔊</button>
+          <button class="icon-btn remove-saved-btn" title="Xóa">🗑️</button>
         </div>
       `;
 
@@ -294,13 +339,13 @@ function renderSavedWords() {
   });
 }
 
-function removeWord(word) {
+function removeWord(text) {
   chrome.storage.local.get({ savedWords: [] }, (res) => {
-    const filtered = res.savedWords.filter(w => w.word.toLowerCase() !== word.toLowerCase());
+    const filtered = res.savedWords.filter(w => w.word.toLowerCase() !== text.toLowerCase());
     chrome.storage.local.set({ savedWords: filtered }, () => {
       renderSavedWords();
       updateWordCount();
-      if (currentWord && currentWord.word.toLowerCase() === word.toLowerCase()) {
+      if (currentText.toLowerCase() === text.toLowerCase()) {
         document.getElementById('quick-save-btn').classList.remove('saved');
       }
     });

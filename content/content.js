@@ -1,16 +1,17 @@
-// SpeakWise - In-Page Direct UI Interactive Coach
+// SpeakWise - In-Page Direct UI Interactive Coach (Word & Full Sentence Support)
 (() => {
   let activeTooltip = null;
   let activeSidePanel = null;
   let recognition = null;
-  let currentTargetWord = '';
+  let currentTargetText = '';
   let currentAudioUrl = '';
   let sidePanelPinned = false;
+  let isSentenceMode = false;
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   /* -------------------------------------------------------------
-     1. Inject Floating Quick Selection Pill & In-Page Tooltip
+     1. Inject Floating Quick Selection Pill
   ------------------------------------------------------------- */
   let selectionPill = null;
 
@@ -45,12 +46,13 @@
       const sel = window.getSelection();
       const text = sel ? sel.toString().trim() : '';
 
-      if (text && text.length > 1 && text.length < 50 && !text.includes('\n')) {
+      // Allow words and long sentences (up to 500 characters)
+      if (text && text.length > 1 && text.length <= 500) {
         try {
           const range = sel.getRangeAt(0);
           const rect = range.getBoundingClientRect();
           if (rect.width > 0 && rect.height > 0) {
-            selectionPill.style.top = `${window.scrollY + rect.top - 38}px`;
+            selectionPill.style.top = `${window.scrollY + rect.top - 40}px`;
             selectionPill.style.left = `${window.scrollX + rect.left + (rect.width / 2) - 45}px`;
             selectionPill.style.display = 'inline-flex';
             return;
@@ -60,7 +62,6 @@
       if (selectionPill) selectionPill.style.display = 'none';
     });
 
-    // Dismiss inline tooltip on outside click
     document.addEventListener('mousedown', (e) => {
       if (activeTooltip && !activeTooltip.contains(e.target) && e.target !== selectionPill) {
         removeInlineTooltip();
@@ -69,19 +70,47 @@
   }
 
   /* -------------------------------------------------------------
-     2. Inline Floating Tooltip (Gắn trực tiếp ngay cạnh chữ đã chọn)
+     2. Translation Helper API (Free Google Translate Endpoint)
   ------------------------------------------------------------- */
-  function showInlineTooltip(rawWord, targetRect) {
+  async function translateText(text, targetLang = 'vi') {
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Translation failed');
+      const data = await res.json();
+      
+      let translated = '';
+      if (data && data[0]) {
+        data[0].forEach(item => {
+          if (item && item[0]) translated += item[0];
+        });
+      }
+      return translated || 'Không dịch được đoạn văn này.';
+    } catch (err) {
+      return 'Lỗi dịch thuật mạng hoặc không phản hồi.';
+    }
+  }
+
+  /* -------------------------------------------------------------
+     3. Inline Floating Tooltip (Sentence & Word)
+  ------------------------------------------------------------- */
+  function showInlineTooltip(rawText, targetRect) {
     removeInlineTooltip();
-    const cleanWord = rawWord.replace(/[^a-zA-Z\s'-]/g, '').trim().toLowerCase();
-    currentTargetWord = cleanWord;
+    const cleanText = rawText.trim();
+    currentTargetText = cleanText;
+
+    // Detect if this is a sentence or single word
+    const wordsCount = cleanText.split(/\s+/).length;
+    isSentenceMode = wordsCount > 2 || cleanText.includes('.') || cleanText.includes('?') || cleanText.includes('!');
 
     activeTooltip = document.createElement('div');
     activeTooltip.id = 'speakwise-inline-tooltip';
-    
-    // Positioning: Float above or below the selected word
+    if (isSentenceMode) {
+      activeTooltip.classList.add('sentence-mode');
+    }
+
     const topPos = window.scrollY + targetRect.bottom + 10;
-    const leftPos = Math.max(10, Math.min(window.innerWidth - 360, window.scrollX + targetRect.left - 20));
+    const leftPos = Math.max(10, Math.min(window.innerWidth - (isSentenceMode ? 420 : 340), window.scrollX + targetRect.left - 20));
 
     activeTooltip.style.top = `${topPos}px`;
     activeTooltip.style.left = `${leftPos}px`;
@@ -90,8 +119,8 @@
       <div class="sp-card">
         <div class="sp-card-header">
           <div class="sp-word-group">
-            <span class="sp-target-word">${cleanWord}</span>
-            <span class="sp-ipa" id="sp-tip-ipa">...</span>
+            <span class="sp-badge-type">${isSentenceMode ? '📄 Câu văn' : '📖 Từ vựng'}</span>
+            ${!isSentenceMode ? `<span class="sp-target-word">${cleanText}</span><span class="sp-ipa" id="sp-tip-ipa">...</span>` : ''}
           </div>
           <div class="sp-header-actions">
             <button class="sp-btn-icon" id="sp-tip-expand-btn" title="Mở Panel chi tiết">⤢</button>
@@ -99,18 +128,26 @@
           </div>
         </div>
 
+        ${isSentenceMode ? `<div class="sp-sentence-original">“${cleanText}”</div>` : ''}
+
+        <!-- Translation Block -->
+        <div class="sp-translation-box" id="sp-tip-translation-box">
+          <div class="sp-trans-label">🇻🇳 Dịch nghĩa:</div>
+          <div class="sp-trans-result" id="sp-tip-trans-text"><div class="sp-loading-spinner"></div></div>
+        </div>
+
         <div class="sp-audio-actions">
-          <button class="sp-pill-btn" id="sp-tip-audio-norm">🔊 Chuẩn</button>
+          <button class="sp-pill-btn" id="sp-tip-audio-norm">🔊 Nghe đọc</button>
           <button class="sp-pill-btn slow" id="sp-tip-audio-slow">🐢 Chậm 0.6x</button>
           <button class="sp-pill-btn star" id="sp-tip-save-btn">⭐ Lưu</button>
         </div>
 
-        <!-- Practice & Score directly on UI -->
+        <!-- Speaking Practice for the sentence/word -->
         <div class="sp-voice-test-box">
           <div class="sp-voice-row">
             <button class="sp-mic-pill" id="sp-tip-mic-btn">
               <span class="sp-mic-icon">🎤</span>
-              <span class="sp-mic-label">Bấm để nói</span>
+              <span class="sp-mic-label">${isSentenceMode ? 'Đọc luyện câu này' : 'Bấm để nói'}</span>
             </button>
             <div class="sp-score-container" id="sp-tip-score-box" style="display:none;">
               <span class="sp-score-badge" id="sp-tip-score-badge">0%</span>
@@ -120,10 +157,11 @@
           <div class="sp-heard-text" id="sp-tip-heard-text"></div>
         </div>
 
-        <!-- In-context definition -->
+        <!-- Detailed dictionary definition if single word -->
+        ${!isSentenceMode ? `
         <div class="sp-definition-box" id="sp-tip-def-box">
           <div class="sp-loading-spinner"></div>
-        </div>
+        </div>` : ''}
       </div>
     `;
 
@@ -132,16 +170,24 @@
     // Bind Tooltip Actions
     document.getElementById('sp-tip-close-btn').addEventListener('click', removeInlineTooltip);
     document.getElementById('sp-tip-expand-btn').addEventListener('click', () => {
-      openSidePanel(currentTargetWord);
+      openSidePanel(currentTargetText);
       removeInlineTooltip();
     });
-    document.getElementById('sp-tip-audio-norm').addEventListener('click', () => playPronunciation(currentTargetWord, 1.0));
-    document.getElementById('sp-tip-audio-slow').addEventListener('click', () => playPronunciation(currentTargetWord, 0.6));
+    document.getElementById('sp-tip-audio-norm').addEventListener('click', () => playPronunciation(currentTargetText, 1.0));
+    document.getElementById('sp-tip-audio-slow').addEventListener('click', () => playPronunciation(currentTargetText, 0.6));
     document.getElementById('sp-tip-mic-btn').addEventListener('click', () => toggleSpeechTest('tip'));
     document.getElementById('sp-tip-save-btn').addEventListener('click', (e) => saveWordToNotebook(e.target));
 
-    // Fetch details
-    fetchWordData(cleanWord, 'tip');
+    // Handle translation
+    translateText(cleanText, 'vi').then(trans => {
+      const transEl = document.getElementById('sp-tip-trans-text');
+      if (transEl) transEl.textContent = trans;
+    });
+
+    // If single word, fetch phonetic & definitions
+    if (!isSentenceMode) {
+      fetchWordData(cleanText, 'tip');
+    }
   }
 
   function removeInlineTooltip() {
@@ -153,9 +199,9 @@
   }
 
   /* -------------------------------------------------------------
-     3. Interactive Side Panel (Docked right sidebar directly inside web page)
+     4. Interactive Side Panel (Word & Sentence Translation)
   ------------------------------------------------------------- */
-  function openSidePanel(word) {
+  function openSidePanel(text) {
     if (!activeSidePanel) {
       activeSidePanel = document.createElement('div');
       activeSidePanel.id = 'speakwise-sidepanel';
@@ -163,7 +209,7 @@
         <div class="sp-panel-header">
           <div class="sp-panel-title">
             <span class="sp-panel-logo">🎙️</span>
-            <strong>SpeakWise Coach</strong>
+            <strong>SpeakWise Translator & Coach</strong>
           </div>
           <div class="sp-panel-controls">
             <button class="sp-panel-btn" id="sp-panel-pin-btn" title="Ghim thanh bên">📌</button>
@@ -172,25 +218,32 @@
         </div>
 
         <div class="sp-panel-search">
-          <input type="text" id="sp-panel-input" placeholder="Tra từ hoặc cụm từ mới..." />
-          <button id="sp-panel-search-btn">Tìm</button>
+          <textarea id="sp-panel-input" rows="2" placeholder="Nhập từ, cụm từ hoặc cả câu văn tiếng Anh..."></textarea>
+          <button id="sp-panel-search-btn">Dịch & Luyện</button>
         </div>
 
         <div class="sp-panel-body" id="sp-panel-body">
           <div class="sp-panel-word-head">
+            <div class="sp-type-indicator" id="sp-panel-type-tag">Từ / Câu văn</div>
             <h2 id="sp-panel-word">...</h2>
             <div class="sp-panel-ipa-row">
-              <span class="sp-ipa" id="sp-panel-ipa">/.../</span>
-              <button class="sp-pill-btn" id="sp-panel-audio-norm">🔊 Chuẩn</button>
-              <button class="sp-pill-btn slow" id="sp-panel-audio-slow">🐢 Chậm</button>
-              <button class="sp-pill-btn star" id="sp-panel-save-btn">⭐ Lưu từ</button>
+              <span class="sp-ipa" id="sp-panel-ipa" style="display:none;">/.../</span>
+              <button class="sp-pill-btn" id="sp-panel-audio-norm">🔊 Nghe đọc</button>
+              <button class="sp-pill-btn slow" id="sp-panel-audio-slow">🐢 Chậm 0.6x</button>
+              <button class="sp-pill-btn star" id="sp-panel-save-btn">⭐ Lưu</button>
             </div>
           </div>
 
-          <!-- Realtime speaking trainer -->
+          <!-- Sentence Translation Result -->
+          <div class="sp-panel-translation-card">
+            <div class="sp-card-title">🇻🇳 Bản dịch tiếng Việt</div>
+            <div class="sp-card-body-text" id="sp-panel-trans-result">Đang dịch...</div>
+          </div>
+
+          <!-- Realtime speaking trainer for sentences -->
           <div class="sp-panel-trainer">
             <div class="sp-trainer-header">
-              <strong>🗣️ Luyện phát âm & Chấm điểm tức thì</strong>
+              <strong>🗣️ Luyện phát âm / Đọc câu & Chấm điểm</strong>
             </div>
             <div class="sp-voice-row">
               <button class="sp-mic-pill" id="sp-panel-mic-btn">
@@ -205,16 +258,17 @@
             <div class="sp-heard-text" id="sp-panel-heard-text"></div>
           </div>
 
-          <!-- Meaning, Context & Sentences -->
-          <div class="sp-panel-section">
-            <h4 class="sp-section-title">Định nghĩa & Ví dụ thực tế</h4>
-            <div id="sp-panel-definitions" class="sp-definitions-list"></div>
-          </div>
+          <!-- Word-specific details (Definitions, Examples, Synonyms) -->
+          <div id="sp-panel-word-extras" style="display:none;">
+            <div class="sp-panel-section">
+              <h4 class="sp-section-title">Định nghĩa & Ví dụ thực tế</h4>
+              <div id="sp-panel-definitions" class="sp-definitions-list"></div>
+            </div>
 
-          <!-- Synonyms -->
-          <div class="sp-panel-section" id="sp-panel-syn-section" style="display:none;">
-            <h4 class="sp-section-title">Từ đồng nghĩa liên quan</h4>
-            <div id="sp-panel-synonyms" class="sp-synonyms-cloud"></div>
+            <div class="sp-panel-section" id="sp-panel-syn-section" style="display:none;">
+              <h4 class="sp-section-title">Từ đồng nghĩa liên quan</h4>
+              <div id="sp-panel-synonyms" class="sp-synonyms-cloud"></div>
+            </div>
           </div>
         </div>
       `;
@@ -226,24 +280,25 @@
       document.getElementById('sp-panel-pin-btn').addEventListener('click', togglePinPanel);
       document.getElementById('sp-panel-search-btn').addEventListener('click', () => {
         const val = document.getElementById('sp-panel-input').value.trim();
-        if (val) loadPanelWord(val);
+        if (val) loadPanelText(val);
       });
       document.getElementById('sp-panel-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
           const val = e.target.value.trim();
-          if (val) loadPanelWord(val);
+          if (val) loadPanelText(val);
         }
       });
-      document.getElementById('sp-panel-audio-norm').addEventListener('click', () => playPronunciation(currentTargetWord, 1.0));
-      document.getElementById('sp-panel-audio-slow').addEventListener('click', () => playPronunciation(currentTargetWord, 0.6));
+      document.getElementById('sp-panel-audio-norm').addEventListener('click', () => playPronunciation(currentTargetText, 1.0));
+      document.getElementById('sp-panel-audio-slow').addEventListener('click', () => playPronunciation(currentTargetText, 0.6));
       document.getElementById('sp-panel-mic-btn').addEventListener('click', () => toggleSpeechTest('panel'));
       document.getElementById('sp-panel-save-btn').addEventListener('click', (e) => saveWordToNotebook(e.target));
     }
 
     activeSidePanel.classList.add('visible');
-    if (word) {
-      document.getElementById('sp-panel-input').value = word;
-      loadPanelWord(word);
+    if (text) {
+      document.getElementById('sp-panel-input').value = text;
+      loadPanelText(text);
     }
   }
 
@@ -267,14 +322,38 @@
     }
   }
 
-  function loadPanelWord(word) {
-    const cleanWord = word.replace(/[^a-zA-Z\s'-]/g, '').trim().toLowerCase();
-    currentTargetWord = cleanWord;
-    fetchWordData(cleanWord, 'panel');
+  function loadPanelText(text) {
+    const cleanText = text.trim();
+    currentTargetText = cleanText;
+
+    const words = cleanText.split(/\s+/).length;
+    const isSentence = words > 2 || cleanText.includes('.') || cleanText.includes('?') || cleanText.includes('!');
+
+    document.getElementById('sp-panel-type-tag').textContent = isSentence ? '📄 Câu văn' : '📖 Từ vựng';
+    document.getElementById('sp-panel-word').textContent = cleanText;
+    document.getElementById('sp-panel-trans-result').textContent = 'Đang dịch...';
+
+    // Translate sentence/word
+    translateText(cleanText, 'vi').then(trans => {
+      document.getElementById('sp-panel-trans-result').textContent = trans;
+    });
+
+    const extras = document.getElementById('sp-panel-word-extras');
+    const ipaEl = document.getElementById('sp-panel-ipa');
+
+    if (!isSentence) {
+      ipaEl.style.display = 'inline-block';
+      extras.style.display = 'block';
+      fetchWordData(cleanText.replace(/[^a-zA-Z\s'-]/g, ''), 'panel');
+    } else {
+      ipaEl.style.display = 'none';
+      extras.style.display = 'none';
+      currentAudioUrl = '';
+    }
   }
 
   /* -------------------------------------------------------------
-     4. Data Fetching (Dictionary & Phonetics API)
+     5. Data Fetching for Single Words
   ------------------------------------------------------------- */
   let currentFetchedEntry = null;
 
@@ -310,7 +389,6 @@
           `;
         }
       } else if (mode === 'panel') {
-        document.getElementById('sp-panel-word').textContent = currentFetchedEntry.word;
         document.getElementById('sp-panel-ipa').textContent = ipa || `/${currentFetchedEntry.word}/`;
 
         const defsContainer = document.getElementById('sp-panel-definitions');
@@ -346,7 +424,7 @@
             chip.textContent = s;
             chip.addEventListener('click', () => {
               document.getElementById('sp-panel-input').value = s;
-              loadPanelWord(s);
+              loadPanelText(s);
             });
             synContainer.appendChild(chip);
           });
@@ -357,23 +435,21 @@
     } catch (err) {
       if (mode === 'tip') {
         const defBox = document.getElementById('sp-tip-def-box');
-        if (defBox) defBox.innerHTML = `<div class="sp-def-error">Không tìm thấy phiên âm của từ này.</div>`;
-      } else if (mode === 'panel') {
-        document.getElementById('sp-panel-definitions').innerHTML = `<div class="sp-def-error">Không tìm thấy thông tin từ.</div>`;
+        if (defBox) defBox.style.display = 'none';
       }
     }
   }
 
   /* -------------------------------------------------------------
-     5. Sound & Text-to-Speech Engine
+     6. Audio & Text-to-Speech Engine
   ------------------------------------------------------------- */
-  function playPronunciation(word, rate = 1.0) {
-    if (currentAudioUrl) {
+  function playPronunciation(text, rate = 1.0) {
+    if (currentAudioUrl && text.split(/\s+/).length <= 2) {
       const audio = new Audio(currentAudioUrl);
       audio.playbackRate = rate;
-      audio.play().catch(() => playBrowserTTS(word, rate));
+      audio.play().catch(() => playBrowserTTS(text, rate));
     } else {
-      playBrowserTTS(word, rate);
+      playBrowserTTS(text, rate);
     }
   }
 
@@ -388,7 +464,7 @@
   }
 
   /* -------------------------------------------------------------
-     6. Voice Recognition & Interactive Accuracy Scorer
+     7. Voice Recognition & Sentence Speaking Scoring
   ------------------------------------------------------------- */
   function toggleSpeechTest(uiMode) {
     const btn = uiMode === 'tip' ? document.getElementById('sp-tip-mic-btn') : document.getElementById('sp-panel-mic-btn');
@@ -410,11 +486,11 @@
 
     btn.classList.add('recording');
     const label = btn.querySelector('.sp-mic-label');
-    if (label) label.textContent = 'Đang lắng nghe...';
+    if (label) label.textContent = 'Đang lắng nghe câu bạn đọc...';
 
     recognition.onresult = (e) => {
       const spoken = e.results[0][0].transcript.toLowerCase().trim();
-      gradeSpeech(currentTargetWord, spoken, uiMode);
+      gradeSpeech(currentTargetText, spoken, uiMode);
     };
 
     recognition.onerror = () => stopRecognition();
@@ -453,21 +529,25 @@
     if (!scoreBox) return;
 
     scoreBox.style.display = 'flex';
-    heardBox.innerHTML = `Bạn phát âm: "<strong>${spoken}</strong>"`;
+    heardBox.innerHTML = `Bạn vừa đọc: "<strong>${spoken}</strong>"`;
 
-    const scorePct = Math.round(calculateSimilarity(target.toLowerCase(), spoken.toLowerCase()) * 100);
+    // Clean punctuation
+    const cleanTarget = target.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
+    const cleanSpoken = spoken.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
+
+    const scorePct = Math.round(calculateSimilarity(cleanTarget, cleanSpoken) * 100);
     scoreBadge.textContent = `${scorePct}%`;
     scoreBadge.className = 'sp-score-badge';
 
-    if (scorePct >= 90) {
+    if (scorePct >= 85) {
       scoreBadge.classList.add('perfect');
-      scoreMsg.textContent = '🌟 Rất xuất sắc! Chuẩn người bản xứ.';
-    } else if (scorePct >= 65) {
+      scoreMsg.textContent = '🌟 Rất lưu loát & chính xác!';
+    } else if (scorePct >= 60) {
       scoreBadge.classList.add('good');
-      scoreMsg.textContent = '👍 Khá chuẩn! Nghe rất tự nhiên.';
+      scoreMsg.textContent = '👍 Tốt! Rõ ràng và dễ hiểu.';
     } else {
       scoreBadge.classList.add('retry');
-      scoreMsg.textContent = '💡 Hãy bấm nút 🐢 Chậm để nghe kỹ âm.';
+      scoreMsg.textContent = '💡 Hãy bấm nút 🐢 Chậm để nghe nhịp câu.';
     }
   }
 
@@ -488,15 +568,18 @@
   }
 
   /* -------------------------------------------------------------
-     7. Save Word Bookmark
+     8. Save Sentence or Word to Vocabulary Notebook
   ------------------------------------------------------------- */
   function saveWordToNotebook(btnEl) {
-    if (!currentFetchedEntry) return;
+    const meaning = document.getElementById('sp-tip-trans-text')?.textContent || 
+                    document.getElementById('sp-panel-trans-result')?.textContent || '';
+    
     const payload = {
-      word: currentFetchedEntry.word,
-      phonetic: currentFetchedEntry.phonetic || '',
+      word: currentTargetText,
+      phonetic: currentFetchedEntry ? currentFetchedEntry.phonetic : '',
       audioUrl: currentAudioUrl,
-      meaning: currentFetchedEntry.meanings && currentFetchedEntry.meanings[0] ? currentFetchedEntry.meanings[0].definitions[0].definition : ''
+      meaning: meaning,
+      isSentence: currentTargetText.split(/\s+/).length > 2
     };
 
     chrome.runtime.sendMessage({ action: "save_word", data: payload }, () => {
@@ -508,7 +591,7 @@
   }
 
   /* -------------------------------------------------------------
-     8. Handle Messages from Background (Context Menu, etc.)
+     9. Handle Messages from Background
   ------------------------------------------------------------- */
   chrome.runtime.onMessage.addListener((req) => {
     if (req.action === "open_modal" && req.text) {
@@ -516,6 +599,5 @@
     }
   });
 
-  // Init
   initSelectionListener();
 })();

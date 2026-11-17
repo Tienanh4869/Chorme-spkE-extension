@@ -12,74 +12,82 @@
         <span class="icon">🎙️</span>
         <div>
           <h1 class="title">SpeakWise</h1>
-          <p class="subtitle">Vocabulary & Pronunciation Coach</p>
+          <p class="subtitle">Vocabulary & Sentence Coach</p>
         </div>
       </div>
-      <div class="stats-badge" id="stats-badge">0 words</div>
+      <div class="stats-badge" id="stats-badge">0 saved</div>
     </header>
 
     <!-- Navigation Tabs -->
     <div class="tabs">
-      <button class="tab-btn active" data-tab="practice-tab">Quick Lookup</button>
-      <button class="tab-btn" data-tab="saved-tab">Notebook & Flashcards</button>
+      <button class="tab-btn active" data-tab="practice-tab">Dịch & Luyện nói</button>
+      <button class="tab-btn" data-tab="saved-tab">Sổ từ & Câu đã lưu</button>
     </div>
 
-    <!-- Tab 1: Quick Practice & Lookup -->
+    <!-- Tab 1: Quick Practice & Sentence Translation -->
     <div id="practice-tab" class="tab-content active">
       <div class="search-box">
-        <input type="text" id="quick-input" placeholder="Type a word to practice pronunciation..." />
-        <button id="quick-search-btn">Search</button>
+        <textarea id="quick-input" rows="2" placeholder="Nhập từ hoặc cả câu tiếng Anh để dịch & luyện đọc..."></textarea>
+        <button id="quick-search-btn">Dịch & Đọc</button>
       </div>
 
       <div id="quick-result" class="result-card" style="display: none;">
         <div class="card-head">
-          <div>
-            <h2 id="result-word">Ephemeral</h2>
+          <div style="flex: 1;">
+            <div class="type-pill" id="result-type">Từ vựng</div>
+            <h2 id="result-word">...</h2>
             <div class="phonetics">
-              <span id="result-ipa">/ɪˈfɛm(ə)rəl/</span>
-              <button id="play-native-btn" class="audio-pill">🔊 Play</button>
-              <button id="play-slow-btn" class="audio-pill slow">🐢 Slow (0.6x)</button>
+              <span id="result-ipa">/.../</span>
+              <button id="play-native-btn" class="audio-pill">🔊 Nghe đọc</button>
+              <button id="play-slow-btn" class="audio-pill slow">🐢 Chậm 0.6x</button>
             </div>
           </div>
-          <button id="quick-save-btn" class="save-icon-btn" title="Save word">⭐</button>
+          <button id="quick-save-btn" class="save-icon-btn" title="Lưu lại">⭐</button>
         </div>
 
-        <!-- Pronunciation Testing Box -->
+        <!-- Translation Display -->
+        <div class="translation-block">
+          <strong class="label">🇻🇳 Bản dịch tiếng Việt:</strong>
+          <p id="result-translation" class="trans-text">Đang dịch...</p>
+        </div>
+
+        <!-- Pronunciation / Speaking Testing Box -->
         <div class="practice-box">
           <div class="practice-header">
-            <strong>🎤 Voice Test</strong>
-            <span class="hint">Check speaking score</span>
+            <strong>🎤 Kiểm tra giọng đọc</strong>
+            <span class="hint">Chấm điểm độ chuẩn</span>
           </div>
           <div class="practice-row">
-            <button id="popup-mic-btn" class="mic-action-btn">🎙️ Speak Now</button>
+            <button id="popup-mic-btn" class="mic-action-btn">🎙️ Bấm để nói</button>
             <div id="score-indicator" class="score-indicator" style="display: none;">
               <span id="score-val" class="score-pill">85%</span>
-              <span id="score-msg" class="score-msg">Good!</span>
+              <span id="score-msg" class="score-msg">Tốt!</span>
             </div>
           </div>
           <div id="spoken-transcript" class="spoken-transcript"></div>
         </div>
 
-        <div class="meaning-box">
-          <strong class="label">Definition:</strong>
+        <!-- Definition for words -->
+        <div class="meaning-box" id="result-definition-container">
+          <strong class="label">Định nghĩa & Ví dụ:</strong>
           <p id="result-definition"></p>
           <p id="result-example" class="example-text"></p>
         </div>
       </div>
     </div>
 
-    <!-- Tab 2: Saved Vocabulary / Flashcards -->
+    <!-- Tab 2: Saved Notebook / Flashcards -->
     <div id="saved-tab" class="tab-content">
       <div class="saved-header">
-        <span>Saved Vocabulary</span>
-        <button id="clear-all-btn" class="link-btn">Clear All</button>
+        <span>Sổ từ vựng & Câu văn</span>
+        <button id="clear-all-btn" class="link-btn">Xóa tất cả</button>
       </div>
       <div id="saved-list" class="saved-list">
         <!-- Rendered items -->
       </div>
       <div id="empty-state" class="empty-state">
-        <p>No words saved yet.</p>
-        <span class="sub">Select any text on websites or search above to save words & practice speaking!</span>
+        <p>Chưa có mục nào được lưu.</p>
+        <span class="sub">Bôi đen từ hoặc câu văn trên bất kỳ website nào để lưu và luyện phát âm!</span>
       </div>
     </div>
   </div>

@@ -1,5 +1,5 @@
 /* ============================================================
-   SpeakWise Direct UI Interaction Styles
+   SpeakWise Direct UI Interaction Styles (Words & Sentences)
 ============================================================ */
 
 /* 1. Floating Selection Pill */
@@ -33,14 +33,19 @@
   to { opacity: 1; transform: scale(1); }
 }
 
-/* 2. Inline Floating Tooltip (Gắn ngay trên dòng chữ) */
+/* 2. Inline Floating Tooltip */
 #speakwise-inline-tooltip {
   position: absolute;
   z-index: 2147483646;
-  width: 320px;
+  width: 330px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #1e293b;
   animation: sp-fade-in 0.2s ease-out;
+}
+
+#speakwise-inline-tooltip.sentence-mode {
+  width: 400px;
+  max-width: 90vw;
 }
 
 @keyframes sp-fade-in {
@@ -68,6 +73,16 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sp-badge-type {
+  font-size: 10.5px;
+  font-weight: 700;
+  background: #e0e7ff;
+  color: #4338ca;
+  padding: 2px 7px;
+  border-radius: 10px;
 }
 
 .sp-target-word {
@@ -84,6 +99,39 @@
   background: #eef2ff;
   padding: 1px 6px;
   border-radius: 4px;
+}
+
+.sp-sentence-original {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.4;
+  padding: 4px 8px;
+  background: #f8fafc;
+  border-left: 3px solid #6366f1;
+  border-radius: 4px;
+}
+
+/* Translation Block */
+.sp-translation-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.sp-trans-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.sp-trans-result {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #0f172a;
+  font-weight: 500;
 }
 
 .sp-header-actions {
@@ -115,7 +163,7 @@
   background: #f1f5f9;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 5px 10px;
   font-size: 11px;
   font-weight: 600;
   color: #334155;
@@ -145,7 +193,7 @@
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
   border-radius: 8px;
-  padding: 8px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -212,7 +260,7 @@
 }
 
 .sp-heard-text {
-  font-size: 10.5px;
+  font-size: 11px;
   color: #475569;
 }
 
@@ -237,11 +285,6 @@
   margin-top: 2px;
 }
 
-.sp-def-error {
-  color: #94a3b8;
-  font-size: 11px;
-}
-
 .sp-loading-spinner {
   width: 14px;
   height: 14px;
@@ -259,7 +302,7 @@
   position: fixed;
   top: 0;
   right: -380px;
-  width: 360px;
+  width: 370px;
   height: 100vh;
   background: #ffffff;
   z-index: 2147483647;
@@ -293,7 +336,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13.5px;
   color: #0f172a;
 }
 
@@ -324,29 +367,33 @@
 
 .sp-panel-search {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px 16px;
   border-bottom: 1px solid #f1f5f9;
 }
 
-.sp-panel-search input {
-  flex: 1;
+.sp-panel-search textarea {
+  width: 100%;
   padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
   font-size: 13px;
   outline: none;
+  resize: vertical;
+  font-family: inherit;
 }
 
-.sp-panel-search input:focus {
+.sp-panel-search textarea:focus {
   border-color: #4f46e5;
 }
 
 .sp-panel-search button {
+  align-self: flex-end;
   background: #4f46e5;
   color: #ffffff;
   border: none;
-  padding: 8px 12px;
+  padding: 8px 16px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
@@ -362,19 +409,51 @@
   gap: 16px;
 }
 
+.sp-type-indicator {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #4338ca;
+  background: #e0e7ff;
+  padding: 2px 6px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
 .sp-panel-word-head h2 {
   margin: 0;
-  font-size: 24px;
-  text-transform: capitalize;
+  font-size: 18px;
   color: #0f172a;
+  line-height: 1.35;
 }
 
 .sp-panel-ipa-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 6px;
+  margin-top: 8px;
   flex-wrap: wrap;
+}
+
+.sp-panel-translation-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.sp-card-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.sp-card-body-text {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #0f172a;
+  font-weight: 500;
 }
 
 .sp-panel-trainer {

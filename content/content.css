@@ -1,0 +1,453 @@
+/* ============================================================
+   SpeakWise Direct UI Interaction Styles
+============================================================ */
+
+/* 1. Floating Selection Pill */
+#speakwise-selection-pill {
+  position: absolute;
+  z-index: 2147483645;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  user-select: none;
+  animation: sp-pop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+#speakwise-selection-pill:hover {
+  background: #4338ca;
+  transform: scale(1.06);
+}
+
+@keyframes sp-pop {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 2. Inline Floating Tooltip (Gắn ngay trên dòng chữ) */
+#speakwise-inline-tooltip {
+  position: absolute;
+  z-index: 2147483646;
+  width: 320px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1e293b;
+  animation: sp-fade-in 0.2s ease-out;
+}
+
+@keyframes sp-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sp-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sp-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sp-word-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-target-word {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: capitalize;
+}
+
+.sp-ipa {
+  font-size: 12px;
+  font-family: monospace;
+  color: #4f46e5;
+  background: #eef2ff;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.sp-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.sp-btn-icon {
+  background: none;
+  border: none;
+  font-size: 15px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.sp-btn-icon:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.sp-audio-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sp-pill-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sp-pill-btn:hover {
+  background: #e2e8f0;
+}
+
+.sp-pill-btn.slow {
+  color: #c2410c;
+  background: #fff7ed;
+  border-color: #ffedd5;
+}
+
+.sp-pill-btn.star {
+  color: #854d0e;
+  background: #fefce8;
+  border-color: #fef08a;
+  margin-left: auto;
+}
+
+/* Speaking evaluation bar */
+.sp-voice-test-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-voice-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-mic-pill {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.sp-mic-pill:hover {
+  background: #059669;
+}
+
+.sp-mic-pill.recording {
+  background: #ef4444;
+  animation: sp-pulse 1s infinite alternate;
+}
+
+@keyframes sp-pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.05); }
+}
+
+.sp-score-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sp-score-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.sp-score-badge.perfect { background: #22c55e; color: #fff; }
+.sp-score-badge.good { background: #3b82f6; color: #fff; }
+.sp-score-badge.retry { background: #f59e0b; color: #fff; }
+
+.sp-score-msg {
+  font-size: 10px;
+  color: #334155;
+  font-weight: 500;
+}
+
+.sp-heard-text {
+  font-size: 10.5px;
+  color: #475569;
+}
+
+.sp-definition-box {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #334155;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 6px;
+}
+
+.sp-pos-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
+.sp-def-example {
+  font-style: italic;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.sp-def-error {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.sp-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: sp-spin 0.6s linear infinite;
+  margin: 4px auto;
+}
+
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+
+/* 3. Interactive Side Panel Docked into Web Page */
+#speakwise-sidepanel {
+  position: fixed;
+  top: 0;
+  right: -380px;
+  width: 360px;
+  height: 100vh;
+  background: #ffffff;
+  z-index: 2147483647;
+  box-shadow: -5px 0 25px rgba(0,0,0,0.12);
+  border-left: 1px solid #e2e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  display: flex;
+  flex-direction: column;
+  transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+#speakwise-sidepanel * {
+  box-sizing: border-box;
+}
+
+#speakwise-sidepanel.visible {
+  right: 0;
+}
+
+.sp-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sp-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.sp-panel-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.sp-panel-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #64748b;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.sp-panel-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.sp-panel-btn.pinned {
+  color: #4f46e5;
+  background: #e0e7ff;
+}
+
+.sp-panel-search {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sp-panel-search input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.sp-panel-search input:focus {
+  border-color: #4f46e5;
+}
+
+.sp-panel-search button {
+  background: #4f46e5;
+  color: #ffffff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sp-panel-body {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sp-panel-word-head h2 {
+  margin: 0;
+  font-size: 24px;
+  text-transform: capitalize;
+  color: #0f172a;
+}
+
+.sp-panel-ipa-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.sp-panel-trainer {
+  background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp-trainer-header {
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.sp-section-title {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.sp-panel-def-group {
+  margin-bottom: 12px;
+}
+
+.sp-pos-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #6366f1;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.sp-panel-def-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.sp-panel-def-eg {
+  margin: 2px 0 6px 0;
+  font-size: 12px;
+  font-style: italic;
+  color: #64748b;
+}
+
+.sp-synonyms-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sp-syn-chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  color: #334155;
+  cursor: pointer;
+}
+
+.sp-syn-chip:hover {
+  background: #e0e7ff;
+  color: #4338ca;
+}

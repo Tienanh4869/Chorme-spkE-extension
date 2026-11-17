@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SpeakWise Dashboard</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="header">
+      <div class="logo">
+        <span class="icon">🎙️</span>
+        <div>
+          <h1 class="title">SpeakWise</h1>
+          <p class="subtitle">Vocabulary & Pronunciation Coach</p>
+        </div>
+      </div>
+      <div class="stats-badge" id="stats-badge">0 words</div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="practice-tab">Quick Lookup</button>
+      <button class="tab-btn" data-tab="saved-tab">Notebook & Flashcards</button>
+    </div>
+
+    <!-- Tab 1: Quick Practice & Lookup -->
+    <div id="practice-tab" class="tab-content active">
+      <div class="search-box">
+        <input type="text" id="quick-input" placeholder="Type a word to practice pronunciation..." />
+        <button id="quick-search-btn">Search</button>
+      </div>
+
+      <div id="quick-result" class="result-card" style="display: none;">
+        <div class="card-head">
+          <div>
+            <h2 id="result-word">Ephemeral</h2>
+            <div class="phonetics">
+              <span id="result-ipa">/ɪˈfɛm(ə)rəl/</span>
+              <button id="play-native-btn" class="audio-pill">🔊 Play</button>
+              <button id="play-slow-btn" class="audio-pill slow">🐢 Slow (0.6x)</button>
+            </div>
+          </div>
+          <button id="quick-save-btn" class="save-icon-btn" title="Save word">⭐</button>
+        </div>
+
+        <!-- Pronunciation Testing Box -->
+        <div class="practice-box">
+          <div class="practice-header">
+            <strong>🎤 Voice Test</strong>
+            <span class="hint">Check speaking score</span>
+          </div>
+          <div class="practice-row">
+            <button id="popup-mic-btn" class="mic-action-btn">🎙️ Speak Now</button>
+            <div id="score-indicator" class="score-indicator" style="display: none;">
+              <span id="score-val" class="score-pill">85%</span>
+              <span id="score-msg" class="score-msg">Good!</span>
+            </div>
+          </div>
+          <div id="spoken-transcript" class="spoken-transcript"></div>
+        </div>
+
+        <div class="meaning-box">
+          <strong class="label">Definition:</strong>
+          <p id="result-definition"></p>
+          <p id="result-example" class="example-text"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Saved Vocabulary / Flashcards -->
+    <div id="saved-tab" class="tab-content">
+      <div class="saved-header">
+        <span>Saved Vocabulary</span>
+        <button id="clear-all-btn" class="link-btn">Clear All</button>
+      </div>
+      <div id="saved-list" class="saved-list">
+        <!-- Rendered items -->
+      </div>
+      <div id="empty-state" class="empty-state">
+        <p>No words saved yet.</p>
+        <span class="sub">Select any text on websites or search above to save words & practice speaking!</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

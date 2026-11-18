@@ -9,26 +9,26 @@
   <div class="popup-container">
     <header class="header">
       <div class="logo">
-        <span class="icon">🎙️</span>
+        <span class="icon">✨</span>
         <div>
-          <h1 class="title">SpeakWise</h1>
-          <p class="subtitle">Vocabulary & Sentence Coach</p>
+          <h1 class="title">SpeakWise Coach</h1>
+          <p class="subtitle">Luyện phát âm & Từ vựng thông minh</p>
         </div>
       </div>
-      <div class="stats-badge" id="stats-badge">0 saved</div>
+      <div class="stats-badge" id="stats-badge">0 mục</div>
     </header>
 
     <!-- Navigation Tabs -->
     <div class="tabs">
       <button class="tab-btn active" data-tab="practice-tab">Dịch & Luyện nói</button>
-      <button class="tab-btn" data-tab="saved-tab">Sổ từ & Câu đã lưu</button>
+      <button class="tab-btn" data-tab="saved-tab">Sổ từ & Flashcards</button>
     </div>
 
     <!-- Tab 1: Quick Practice & Sentence Translation -->
     <div id="practice-tab" class="tab-content active">
       <div class="search-box">
-        <textarea id="quick-input" rows="2" placeholder="Nhập từ hoặc cả câu tiếng Anh để dịch & luyện đọc..."></textarea>
-        <button id="quick-search-btn">Dịch & Đọc</button>
+        <textarea id="quick-input" rows="2" placeholder="Nhập từ hoặc câu tiếng Anh (phím tắt: Alt+S nghe nhanh, Alt+W mở bảng)..."></textarea>
+        <button id="quick-search-btn">Tra Nghĩa & Luyện Đọc</button>
       </div>
 
       <div id="quick-result" class="result-card" style="display: none;">
@@ -38,7 +38,7 @@
             <h2 id="result-word">...</h2>
             <div class="phonetics">
               <span id="result-ipa">/.../</span>
-              <button id="play-native-btn" class="audio-pill">🔊 Nghe đọc</button>
+              <button id="play-native-btn" class="audio-pill">🔊 Nghe chuẩn</button>
               <button id="play-slow-btn" class="audio-pill slow">🐢 Chậm 0.6x</button>
             </div>
           </div>
@@ -48,14 +48,14 @@
         <!-- Translation Display -->
         <div class="translation-block">
           <strong class="label">🇻🇳 Bản dịch tiếng Việt:</strong>
-          <p id="result-translation" class="trans-text">Đang dịch...</p>
+          <div id="result-translation" class="trans-text">Đang dịch...</div>
         </div>
 
-        <!-- Pronunciation / Speaking Testing Box -->
+        <!-- Pronunciation / Speaking Testing Box with Word Chips -->
         <div class="practice-box">
           <div class="practice-header">
-            <strong>🎤 Kiểm tra giọng đọc</strong>
-            <span class="hint">Chấm điểm độ chuẩn</span>
+            <strong>🎤 Kiểm tra giọng đọc & Điểm số</strong>
+            <span class="hint">Chấm điểm chi tiết từng từ</span>
           </div>
           <div class="practice-row">
             <button id="popup-mic-btn" class="mic-action-btn">🎙️ Bấm để nói</button>
@@ -65,29 +65,33 @@
             </div>
           </div>
           <div id="spoken-transcript" class="spoken-transcript"></div>
+          <div id="popup-word-breakdown" class="word-breakdown-box" style="display:none;"></div>
         </div>
 
         <!-- Definition for words -->
         <div class="meaning-box" id="result-definition-container">
-          <strong class="label">Định nghĩa & Ví dụ:</strong>
+          <strong class="label">Định nghĩa ngữ cảnh (Anh - Anh):</strong>
           <p id="result-definition"></p>
           <p id="result-example" class="example-text"></p>
         </div>
       </div>
     </div>
 
-    <!-- Tab 2: Saved Notebook / Flashcards -->
+    <!-- Tab 2: Saved Notebook / Flashcards with Export -->
     <div id="saved-tab" class="tab-content">
       <div class="saved-header">
-        <span>Sổ từ vựng & Câu văn</span>
-        <button id="clear-all-btn" class="link-btn">Xóa tất cả</button>
+        <span>Sổ tay cá nhân</span>
+        <div class="saved-tools">
+          <button id="export-csv-btn" class="tool-btn" title="Xuất file CSV học Anki/Excel">📥 Xuất CSV</button>
+          <button id="clear-all-btn" class="tool-btn danger" title="Xóa tất cả">🗑️ Xóa hết</button>
+        </div>
       </div>
       <div id="saved-list" class="saved-list">
         <!-- Rendered items -->
       </div>
       <div id="empty-state" class="empty-state">
         <p>Chưa có mục nào được lưu.</p>
-        <span class="sub">Bôi đen từ hoặc câu văn trên bất kỳ website nào để lưu và luyện phát âm!</span>
+        <span class="sub">Bôi đen từ hoặc câu văn trên website rồi bấm ⭐ Lưu từ để ôn tập flashcard!</span>
       </div>
     </div>
   </div>

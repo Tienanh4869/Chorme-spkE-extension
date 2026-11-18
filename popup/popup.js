@@ -1,4 +1,4 @@
-// Popup Logic (Dedicated Vietnamese Meaning Support)
+// Popup Logic (High-Speed & CSV Export)
 let currentText = '';
 let currentAudio = null;
 let recognition = null;
@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Save / Bookmark
   document.getElementById('quick-save-btn').addEventListener('click', toggleSaveWord);
+
+  // Export CSV
+  document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
 
   // Clear all
   document.getElementById('clear-all-btn').addEventListener('click', () => {
@@ -101,6 +104,7 @@ async function processInput(text) {
   const resultCard = document.getElementById('quick-result');
   const scoreBox = document.getElementById('score-indicator');
   const transcriptBox = document.getElementById('spoken-transcript');
+  const breakdownBox = document.getElementById('popup-word-breakdown');
   const defContainer = document.getElementById('result-definition-container');
   const ipaEl = document.getElementById('result-ipa');
   const typeEl = document.getElementById('result-type');
@@ -108,6 +112,7 @@ async function processInput(text) {
 
   scoreBox.style.display = 'none';
   transcriptBox.textContent = '';
+  if (breakdownBox) breakdownBox.style.display = 'none';
   resultCard.style.display = 'flex';
 
   document.getElementById('result-word').textContent = text;
@@ -235,28 +240,48 @@ function evaluateSpeech(spoken) {
   const scoreBox = document.getElementById('score-indicator');
   const scoreVal = document.getElementById('score-val');
   const scoreMsg = document.getElementById('score-msg');
+  const breakdownBox = document.getElementById('popup-word-breakdown');
 
   scoreBox.style.display = 'flex';
   transcriptBox.innerHTML = `Đã nghe: "<strong>${spoken}</strong>"`;
 
-  const cleanTarget = currentText.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
-  const cleanSpoken = spoken.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
+  const targetWords = currentText.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "").split(/\s+/).filter(Boolean);
+  const spokenWords = spoken.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "").split(/\s+/).filter(Boolean);
 
-  const sim = getSimilarity(cleanTarget, cleanSpoken);
-  const pct = Math.round(sim * 100);
+  let correctCount = 0;
+  let breakdownHtml = '';
 
-  scoreVal.textContent = `${pct}%`;
+  targetWords.forEach(tWord => {
+    const hasMatch = spokenWords.some(sWord => getSimilarity(tWord, sWord) >= 0.75);
+    if (hasMatch) {
+      correctCount++;
+      breakdownHtml += `<span class="sp-chip correct">✓ ${tWord}</span>`;
+    } else {
+      breakdownHtml += `<span class="sp-chip missed">✗ ${tWord}</span>`;
+    }
+  });
+
+  const wordLevelScore = targetWords.length > 0 ? (correctCount / targetWords.length) : 1;
+  const stringScore = getSimilarity(targetWords.join(' '), spokenWords.join(' '));
+  const finalScorePct = Math.round(((wordLevelScore * 0.7) + (stringScore * 0.3)) * 100);
+
+  scoreVal.textContent = `${finalScorePct}%`;
   scoreVal.className = 'score-pill';
 
-  if (pct >= 85) {
+  if (finalScorePct >= 85) {
     scoreVal.classList.add('excellent');
     scoreMsg.textContent = '🌟 Rất lưu loát!';
-  } else if (pct >= 60) {
+  } else if (finalScorePct >= 60) {
     scoreVal.classList.add('good');
     scoreMsg.textContent = '👍 Khá chuẩn!';
   } else {
     scoreVal.classList.add('needs-work');
     scoreMsg.textContent = '💡 Thử nghe lại';
+  }
+
+  if (breakdownBox) {
+    breakdownBox.innerHTML = breakdownHtml;
+    breakdownBox.style.display = 'flex';
   }
 }
 
@@ -375,5 +400,33 @@ function removeWord(text) {
         document.getElementById('quick-save-btn').classList.remove('saved');
       }
     });
+  });
+}
+
+// Export Flashcard CSV for Anki / Excel
+function exportToCSV() {
+  chrome.storage.local.get({ savedWords: [] }, (res) => {
+    const words = res.savedWords;
+    if (words.length === 0) {
+      alert('Sổ tay chưa có từ nào để xuất!');
+      return;
+    }
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+    csvContent += "Từ / Câu tiếng Anh,Phiên âm,Nghĩa Tiếng Việt,Thời gian lưu\r\n";
+    words.forEach(w => {
+      const cleanWord = `"${(w.word || '').replace(/"/g, '""')}"`;
+      const cleanPhonetic = `"${(w.phonetic || '').replace(/"/g, '""')}"`;
+      const cleanMeaning = `"${(w.meaning || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
+      const dateStr = `"${new Date(w.createdAt || Date.now()).toLocaleDateString()}"`;
+      csvContent += `${cleanWord},${cleanPhonetic},${cleanMeaning},${dateStr}\r\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `speakwise_vocabulary_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   });
 }

@@ -1,4 +1,4 @@
-// SpeakWise - Smart AI Contextual & Vietnamese Learning Coach
+// SpeakWise - High Performance In-Page Coach & Phonetic Scorer
 (() => {
   let activeTooltip = null;
   let activeSidePanel = null;
@@ -8,11 +8,16 @@
   let currentAudioUrl = '';
   let sidePanelPinned = false;
   let isSentenceMode = false;
+  let mouseUpTimeout = null;
+
+  // In-Memory LRU Cache for Instant Performance (Zero Network Delay on Repetitive words)
+  const translationCache = new Map();
+  const dictionaryCache = new Map();
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   /* -------------------------------------------------------------
-     1. Smart Context Extractor (Lấy ngữ cảnh xung quanh câu/từ bị thiếu)
+     1. Smart Context Extractor
   ------------------------------------------------------------- */
   function getSurroundingSentence(selection) {
     try {
@@ -24,25 +29,23 @@
       }
       if (!container) return '';
       const fullParagraph = container.innerText || container.textContent || '';
-      return fullParagraph.slice(0, 600).trim();
+      return fullParagraph.slice(0, 500).trim();
     } catch (e) {
       return '';
     }
   }
 
   /* -------------------------------------------------------------
-     2. Smart Inference Engine (Đoán từ thiếu, sửa lỗi & suy luận ngữ cảnh)
+     2. Smart Inference & Grammar Repair Engine
   ------------------------------------------------------------- */
   function analyzeAndRepairText(text, context) {
     let repaired = text;
     let missingWordGuessed = false;
     let explanation = '';
 
-    // Check placeholders like "...", "___", "[?]", or missing words
     const missingPattern = /\b(___|\.\.\.|\?{2,}|\[\w*\])\b/i;
     const hasMissingWordMarker = missingPattern.test(text);
 
-    // Common English missing grammar & typos repair
     const commonRepairs = [
       { rule: /\b(how u)\b/gi, fix: 'how are you' },
       { rule: /\b(i go school yesterday)\b/gi, fix: 'I went to school yesterday' },
@@ -71,14 +74,18 @@
   }
 
   /* -------------------------------------------------------------
-     3. Free Gemini / Neural Context-Aware Translation
+     3. Cached High-Speed Translation API
   ------------------------------------------------------------- */
   async function smartTranslate(text, context) {
     const analysis = analyzeAndRepairText(text, context);
     const targetQuery = analysis.repairedText;
+    const cacheKey = targetQuery.toLowerCase();
+
+    if (translationCache.has(cacheKey)) {
+      return translationCache.get(cacheKey);
+    }
 
     try {
-      // 1. Fetch Google Neural GTX with Vietnamese Dictionary
       const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=bd&dt=qc&dt=rm&q=${encodeURIComponent(targetQuery)}`;
       const res = await fetch(url);
       const data = await res.json();
@@ -90,7 +97,6 @@
         });
       }
 
-      // Check Google's Spellcheck / Correction suggestion
       let correctedQuery = '';
       if (data && data[7] && data[7][1]) {
         correctedQuery = data[7][1];
@@ -106,20 +112,25 @@
         });
       }
 
-      // If text has missing word markers, generate smart deduction
       let smartGuessNote = '';
       if (text.includes('...') || text.includes('___')) {
-        smartGuessNote = `💡 <strong>Suy luận ngữ cảnh:</strong> Câu có vị trí bị khuyết (placeholder). Hệ thống đã dựa vào tiền đề để dịch trọn ý tự nhiên nhất.`;
+        smartGuessNote = `💡 <strong>Suy luận ngữ cảnh:</strong> Phát hiện vị trí khuyết từ. Đã dịch trọn ý tự nhiên nhất theo đoạn văn.`;
       } else if (correctedQuery) {
         smartGuessNote = `💡 <strong>Tự động nhận diện từ đúng:</strong> Hệ thống đoán bạn muốn dùng cụm <em>"${correctedQuery}"</em>.`;
       }
 
-      return {
+      const result = {
         translation: primaryTranslation.trim() || 'Chưa có bản dịch.',
         smartGuessNote: smartGuessNote,
         dictEntries: dictEntries,
         repaired: analysis.repairedText
       };
+
+      // Store in LRU cache
+      if (translationCache.size > 200) translationCache.clear();
+      translationCache.set(cacheKey, result);
+
+      return result;
     } catch (e) {
       return {
         translation: 'Lỗi nạp bản dịch thông minh.',
@@ -131,7 +142,7 @@
   }
 
   /* -------------------------------------------------------------
-     4. Floating Selection Pill
+     4. Floating Selection Pill with Debounce
   ------------------------------------------------------------- */
   let selectionPill = null;
 
@@ -140,7 +151,7 @@
     selectionPill.id = 'speakwise-selection-pill';
     selectionPill.innerHTML = `
       <span class="sp-pill-icon">✨</span>
-      <span class="sp-pill-text">Smart Dịch & Luyện</span>
+      <span class="sp-pill-text">SpeakWise Dịch & Luyện</span>
     `;
     selectionPill.style.display = 'none';
     document.documentElement.appendChild(selectionPill);
@@ -164,22 +175,29 @@
       if (activeSidePanel && activeSidePanel.contains(e.target)) return;
       if (selectionPill && selectionPill.contains(e.target)) return;
 
-      const sel = window.getSelection();
-      const text = sel ? sel.toString().trim() : '';
+      clearTimeout(mouseUpTimeout);
+      mouseUpTimeout = setTimeout(() => {
+        const sel = window.getSelection();
+        const text = sel ? sel.toString().trim() : '';
 
-      if (text && text.length > 1 && text.length <= 600) {
-        try {
-          const range = sel.getRangeAt(0);
-          const rect = range.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) {
-            selectionPill.style.top = `${window.scrollY + rect.top - 42}px`;
-            selectionPill.style.left = `${window.scrollX + rect.left + (rect.width / 2) - 65}px`;
-            selectionPill.style.display = 'inline-flex';
-            return;
-          }
-        } catch (err) {}
-      }
-      if (selectionPill) selectionPill.style.display = 'none';
+        if (text && text.length > 1 && text.length <= 600) {
+          try {
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              const pillWidth = 140;
+              const leftPos = Math.max(10, Math.min(window.innerWidth - pillWidth - 10, window.scrollX + rect.left + (rect.width / 2) - (pillWidth / 2)));
+              const topPos = Math.max(window.scrollY + 10, window.scrollY + rect.top - 42);
+
+              selectionPill.style.top = `${topPos}px`;
+              selectionPill.style.left = `${leftPos}px`;
+              selectionPill.style.display = 'inline-flex';
+              return;
+            }
+          } catch (err) {}
+        }
+        if (selectionPill) selectionPill.style.display = 'none';
+      }, 50);
     });
 
     document.addEventListener('mousedown', (e) => {
@@ -190,7 +208,7 @@
   }
 
   /* -------------------------------------------------------------
-     5. Inline Floating Tooltip với Smart Deduction
+     5. Inline Floating Tooltip with Boundary Detection
   ------------------------------------------------------------- */
   function showInlineTooltip(rawText, context, targetRect) {
     removeInlineTooltip();
@@ -207,8 +225,23 @@
       activeTooltip.classList.add('sentence-mode');
     }
 
-    const topPos = window.scrollY + targetRect.bottom + 10;
-    const leftPos = Math.max(10, Math.min(window.innerWidth - (isSentenceMode ? 440 : 360), window.scrollX + targetRect.left - 20));
+    const tipWidth = isSentenceMode ? 430 : 350;
+    const tipEstimatedHeight = 280;
+
+    // Viewport-aware boundary collision check
+    let leftPos = window.scrollX + targetRect.left;
+    if (leftPos + tipWidth > window.scrollX + window.innerWidth - 15) {
+      leftPos = window.scrollX + window.innerWidth - tipWidth - 15;
+    }
+    if (leftPos < window.scrollX + 10) {
+      leftPos = window.scrollX + 10;
+    }
+
+    let topPos = window.scrollY + targetRect.bottom + 8;
+    // If tooltip overflows bottom of screen, flip it above the selected text
+    if (targetRect.bottom + tipEstimatedHeight > window.innerHeight && targetRect.top > tipEstimatedHeight) {
+      topPos = window.scrollY + targetRect.top - tipEstimatedHeight - 8;
+    }
 
     activeTooltip.style.top = `${topPos}px`;
     activeTooltip.style.left = `${leftPos}px`;
@@ -221,7 +254,7 @@
             ${!isSentenceMode ? `<span class="sp-target-word">${cleanText}</span><span class="sp-ipa" id="sp-tip-ipa">...</span>` : ''}
           </div>
           <div class="sp-header-actions">
-            <button class="sp-btn-icon" id="sp-tip-expand-btn" title="Mở Panel chi tiết">⤢</button>
+            <button class="sp-btn-icon" id="sp-tip-expand-btn" title="Mở Panel bên phải (Alt+W)">⤢</button>
             <button class="sp-btn-icon" id="sp-tip-close-btn" title="Đóng">&times;</button>
           </div>
         </div>
@@ -236,7 +269,6 @@
           <div class="sp-vn-primary" id="sp-tip-vn-primary">
             <div class="sp-loading-spinner"></div>
           </div>
-          <!-- Smart Guess Tag (nếu thiếu từ hoặc có suy luận) -->
           <div id="sp-tip-smart-guess" class="sp-smart-guess-box" style="display:none;"></div>
           <div class="sp-vn-sub-meanings" id="sp-tip-vn-subs" style="display:none;"></div>
         </div>
@@ -247,7 +279,7 @@
           <button class="sp-pill-btn star" id="sp-tip-save-btn">⭐ Lưu lại</button>
         </div>
 
-        <!-- Luyện nói & Chấm điểm -->
+        <!-- Luyện nói với Word-Level Highlighting -->
         <div class="sp-voice-test-box">
           <div class="sp-voice-row">
             <button class="sp-mic-pill" id="sp-tip-mic-btn">
@@ -260,6 +292,8 @@
             </div>
           </div>
           <div class="sp-heard-text" id="sp-tip-heard-text"></div>
+          <!-- Word Breakdown Visualizer -->
+          <div class="sp-word-breakdown" id="sp-tip-word-breakdown" style="display:none;"></div>
         </div>
 
         ${!isSentenceMode ? `
@@ -282,7 +316,7 @@
     document.getElementById('sp-tip-mic-btn').addEventListener('click', () => toggleSpeechTest('tip'));
     document.getElementById('sp-tip-save-btn').addEventListener('click', (e) => saveWordToNotebook(e.target));
 
-    // Thực hiện Smart Translate
+    // Async Fetch Translation with Cache
     smartTranslate(cleanText, context).then(res => {
       const primaryEl = document.getElementById('sp-tip-vn-primary');
       const guessEl = document.getElementById('sp-tip-smart-guess');
@@ -321,7 +355,7 @@
   }
 
   /* -------------------------------------------------------------
-     6. Side Panel với Smart Translate
+     6. Side Panel
   ------------------------------------------------------------- */
   function openSidePanel(text, context = '') {
     if (!activeSidePanel) {
@@ -365,7 +399,7 @@
 
           <div class="sp-panel-trainer">
             <div class="sp-trainer-header">
-              <strong>🗣️ Luyện đọc cả câu & Chấm điểm chính xác</strong>
+              <strong>🗣️ Luyện đọc cả câu & Chấm điểm chi tiết</strong>
             </div>
             <div class="sp-voice-row">
               <button class="sp-mic-pill" id="sp-panel-mic-btn">
@@ -378,6 +412,7 @@
               </div>
             </div>
             <div class="sp-heard-text" id="sp-panel-heard-text"></div>
+            <div class="sp-word-breakdown" id="sp-panel-word-breakdown" style="display:none;"></div>
           </div>
 
           <div id="sp-panel-word-extras" style="display:none;">
@@ -496,85 +531,24 @@
   }
 
   /* -------------------------------------------------------------
-     7. English Extras
+     7. English Extras with Caching
   ------------------------------------------------------------- */
   let currentFetchedEntry = null;
 
   async function fetchEnglishExtras(word, mode) {
+    const cacheKey = word.toLowerCase();
+    if (dictionaryCache.has(cacheKey)) {
+      renderEnglishData(dictionaryCache.get(cacheKey), mode);
+      return;
+    }
+
     try {
       const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
       if (!res.ok) throw new Error('Not found');
       const data = await res.json();
       currentFetchedEntry = data[0];
-
-      let ipa = currentFetchedEntry.phonetic || '';
-      currentAudioUrl = '';
-
-      if (currentFetchedEntry.phonetics && currentFetchedEntry.phonetics.length > 0) {
-        for (const p of currentFetchedEntry.phonetics) {
-          if (!ipa && p.text) ipa = p.text;
-          if (p.audio && !currentAudioUrl) currentAudioUrl = p.audio;
-        }
-      }
-
-      if (mode === 'tip') {
-        const ipaEl = document.getElementById('sp-tip-ipa');
-        if (ipaEl) ipaEl.textContent = ipa || `/${currentFetchedEntry.word}/`;
-
-        const defBox = document.getElementById('sp-tip-def-box');
-        if (defBox && currentFetchedEntry.meanings && currentFetchedEntry.meanings[0]) {
-          const m = currentFetchedEntry.meanings[0];
-          const d = m.definitions[0];
-          defBox.innerHTML = `
-            <div class="sp-pos-label">Context (Anh - Anh)</div>
-            <div class="sp-def-text">${d.definition}</div>
-            ${d.example ? `<div class="sp-def-example">“${d.example}”</div>` : ''}
-          `;
-        }
-      } else if (mode === 'panel') {
-        document.getElementById('sp-panel-ipa').textContent = ipa || `/${currentFetchedEntry.word}/`;
-
-        const defsContainer = document.getElementById('sp-panel-definitions');
-        defsContainer.innerHTML = '';
-        const allSynonyms = new Set();
-
-        currentFetchedEntry.meanings.slice(0, 2).forEach(m => {
-          const wrap = document.createElement('div');
-          wrap.className = 'sp-panel-def-group';
-          let defsListHtml = '';
-          m.definitions.slice(0, 2).forEach(d => {
-            defsListHtml += `
-              <div class="sp-panel-def-row">
-                <p class="sp-panel-def-desc">${d.definition}</p>
-                ${d.example ? `<p class="sp-panel-def-eg">“${d.example}”</p>` : ''}
-              </div>
-            `;
-          });
-          wrap.innerHTML = `<span class="sp-pos-tag">${m.partOfSpeech}</span>${defsListHtml}`;
-          defsContainer.appendChild(wrap);
-
-          if (m.synonyms) m.synonyms.forEach(s => allSynonyms.add(s));
-        });
-
-        const synSection = document.getElementById('sp-panel-syn-section');
-        const synContainer = document.getElementById('sp-panel-synonyms');
-        synContainer.innerHTML = '';
-        if (allSynonyms.size > 0) {
-          synSection.style.display = 'block';
-          Array.from(allSynonyms).slice(0, 8).forEach(s => {
-            const chip = document.createElement('span');
-            chip.className = 'sp-syn-chip';
-            chip.textContent = s;
-            chip.addEventListener('click', () => {
-              document.getElementById('sp-panel-input').value = s;
-              loadPanelText(s, '');
-            });
-            synContainer.appendChild(chip);
-          });
-        } else {
-          synSection.style.display = 'none';
-        }
-      }
+      dictionaryCache.set(cacheKey, currentFetchedEntry);
+      renderEnglishData(currentFetchedEntry, mode);
     } catch (err) {
       if (mode === 'tip') {
         const defBox = document.getElementById('sp-tip-def-box');
@@ -583,8 +557,80 @@
     }
   }
 
+  function renderEnglishData(entry, mode) {
+    currentFetchedEntry = entry;
+    let ipa = entry.phonetic || '';
+    currentAudioUrl = '';
+
+    if (entry.phonetics && entry.phonetics.length > 0) {
+      for (const p of entry.phonetics) {
+        if (!ipa && p.text) ipa = p.text;
+        if (p.audio && !currentAudioUrl) currentAudioUrl = p.audio;
+      }
+    }
+
+    if (mode === 'tip') {
+      const ipaEl = document.getElementById('sp-tip-ipa');
+      if (ipaEl) ipaEl.textContent = ipa || `/${entry.word}/`;
+
+      const defBox = document.getElementById('sp-tip-def-box');
+      if (defBox && entry.meanings && entry.meanings[0]) {
+        const m = entry.meanings[0];
+        const d = m.definitions[0];
+        defBox.innerHTML = `
+          <div class="sp-pos-label">Context (Anh - Anh)</div>
+          <div class="sp-def-text">${d.definition}</div>
+          ${d.example ? `<div class="sp-def-example">“${d.example}”</div>` : ''}
+        `;
+      }
+    } else if (mode === 'panel') {
+      document.getElementById('sp-panel-ipa').textContent = ipa || `/${entry.word}/`;
+
+      const defsContainer = document.getElementById('sp-panel-definitions');
+      defsContainer.innerHTML = '';
+      const allSynonyms = new Set();
+
+      entry.meanings.slice(0, 2).forEach(m => {
+        const wrap = document.createElement('div');
+        wrap.className = 'sp-panel-def-group';
+        let defsListHtml = '';
+        m.definitions.slice(0, 2).forEach(d => {
+          defsListHtml += `
+            <div class="sp-panel-def-row">
+              <p class="sp-panel-def-desc">${d.definition}</p>
+              ${d.example ? `<p class="sp-panel-def-eg">“${d.example}”</p>` : ''}
+            </div>
+          `;
+        });
+        wrap.innerHTML = `<span class="sp-pos-tag">${m.partOfSpeech}</span>${defsListHtml}`;
+        defsContainer.appendChild(wrap);
+
+        if (m.synonyms) m.synonyms.forEach(s => allSynonyms.add(s));
+      });
+
+      const synSection = document.getElementById('sp-panel-syn-section');
+      const synContainer = document.getElementById('sp-panel-synonyms');
+      synContainer.innerHTML = '';
+      if (allSynonyms.size > 0) {
+        synSection.style.display = 'block';
+        Array.from(allSynonyms).slice(0, 8).forEach(s => {
+          const chip = document.createElement('span');
+          chip.className = 'sp-syn-chip';
+          chip.textContent = s;
+          chip.addEventListener('click', () => {
+            document.getElementById('sp-panel-input').value = s;
+            loadPanelText(s, '');
+          });
+          synContainer.appendChild(chip);
+        });
+      } else {
+        synSection.style.display = 'none';
+      }
+    }
+  }
+
   /* -------------------------------------------------------------
-     8. Audio & Speech
+     8. Audio & TTS
   ------------------------------------------------------------- */
   function playPronunciation(text, rate = 1.0) {
     if (currentAudioUrl && text.split(/\s+/).length <= 2) {
@@ -607,7 +653,7 @@
   }
 
   /* -------------------------------------------------------------
-     9. Voice Scoring
+     9. Advanced Phonetic & Word-Level Scorer
   ------------------------------------------------------------- */
   function toggleSpeechTest(uiMode) {
     const btn = uiMode === 'tip' ? document.getElementById('sp-tip-mic-btn') : document.getElementById('sp-panel-mic-btn');
@@ -662,34 +708,61 @@
     }
   }
 
+  // Enhanced Word-Level Breakdown & Similarity Calculation
   function gradeSpeech(target, spoken, uiMode) {
     const prefix = uiMode === 'tip' ? 'sp-tip' : 'sp-panel';
     const scoreBox = document.getElementById(`${prefix}-score-box`);
     const scoreBadge = document.getElementById(`${prefix}-score-badge`);
     const scoreMsg = document.getElementById(`${prefix}-score-msg`);
     const heardBox = document.getElementById(`${prefix}-heard-text`);
+    const breakdownBox = document.getElementById(`${prefix}-word-breakdown`);
 
     if (!scoreBox) return;
 
     scoreBox.style.display = 'flex';
     heardBox.innerHTML = `Bạn vừa đọc: "<strong>${spoken}</strong>"`;
 
-    const cleanTarget = target.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
-    const cleanSpoken = spoken.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "");
+    const targetWords = target.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "").split(/\s+/).filter(Boolean);
+    const spokenWords = spoken.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "").split(/\s+/).filter(Boolean);
 
-    const scorePct = Math.round(calculateSimilarity(cleanTarget, cleanSpoken) * 100);
-    scoreBadge.textContent = `${scorePct}%`;
+    // Calculate word-level accuracy
+    let correctCount = 0;
+    let breakdownHtml = '<div class="sp-breakdown-title">Chi tiết từng từ bạn đọc:</div><div class="sp-words-chips">';
+
+    targetWords.forEach(tWord => {
+      // Check exact match or phonetic similarity
+      const hasMatch = spokenWords.some(sWord => calculateSimilarity(tWord, sWord) >= 0.75);
+      if (hasMatch) {
+        correctCount++;
+        breakdownHtml += `<span class="sp-word-chip correct" title="Phát âm chuẩn">✓ ${tWord}</span>`;
+      } else {
+        breakdownHtml += `<span class="sp-word-chip missed" title="Cần phát âm rõ hơn">✗ ${tWord}</span>`;
+      }
+    });
+
+    breakdownHtml += '</div>';
+
+    const wordLevelScore = targetWords.length > 0 ? (correctCount / targetWords.length) : 1;
+    const stringScore = calculateSimilarity(targetWords.join(' '), spokenWords.join(' '));
+    const finalScorePct = Math.round(((wordLevelScore * 0.7) + (stringScore * 0.3)) * 100);
+
+    scoreBadge.textContent = `${finalScorePct}%`;
     scoreBadge.className = 'sp-score-badge';
 
-    if (scorePct >= 85) {
+    if (finalScorePct >= 85) {
       scoreBadge.classList.add('perfect');
       scoreMsg.textContent = '🌟 Rất xuất sắc & chuẩn bản xứ!';
-    } else if (scorePct >= 60) {
+    } else if (finalScorePct >= 60) {
       scoreBadge.classList.add('good');
-      scoreMsg.textContent = '👍 Rõ ràng, người bản ngữ hiểu tốt.';
+      scoreMsg.textContent = '👍 Khá chuẩn, người bản ngữ hiểu tốt!';
     } else {
       scoreBadge.classList.add('retry');
       scoreMsg.textContent = '💡 Hãy bấm nút 🐢 Chậm để nghe kỹ âm.';
+    }
+
+    if (breakdownBox) {
+      breakdownBox.innerHTML = breakdownHtml;
+      breakdownBox.style.display = 'block';
     }
   }
 
@@ -733,11 +806,23 @@
   }
 
   /* -------------------------------------------------------------
-     11. Messages from Background
+     11. Keyboard Shortcuts & Background Listeners
   ------------------------------------------------------------- */
   chrome.runtime.onMessage.addListener((req) => {
     if (req.action === "open_modal" && req.text) {
       openSidePanel(req.text, '');
+    } else if (req.action === "shortcut_read_selection") {
+      const selText = window.getSelection().toString().trim();
+      if (selText) {
+        playPronunciation(selText, 1.0);
+      }
+    } else if (req.action === "shortcut_toggle_panel") {
+      if (activeSidePanel && activeSidePanel.classList.contains('visible')) {
+        closeSidePanel();
+      } else {
+        const selText = window.getSelection().toString().trim();
+        openSidePanel(selText || 'Hello', '');
+      }
     }
   });
 

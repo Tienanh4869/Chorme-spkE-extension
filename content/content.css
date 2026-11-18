@@ -1,5 +1,5 @@
 /* ============================================================
-   SpeakWise Smart AI & Contextual Styling
+   SpeakWise High Performance, Word Highlighting & Dark Theme Ready
 ============================================================ */
 
 /* 1. Floating Selection Pill */
@@ -233,7 +233,7 @@
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .sp-voice-row {
@@ -299,6 +299,47 @@
 .sp-heard-text {
   font-size: 11px;
   color: #475569;
+}
+
+/* Word Breakdown Chips (Đánh dấu từ phát âm đúng / sai) */
+.sp-word-breakdown {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.sp-breakdown-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.sp-words-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sp-word-chip {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.sp-word-chip.correct {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.sp-word-chip.missed {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
 }
 
 .sp-definition-box {

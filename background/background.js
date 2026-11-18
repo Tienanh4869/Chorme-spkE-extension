@@ -2,7 +2,7 @@
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "speakwise-lookup",
-    title: "SpeakWise: Practice & Learn '%s'",
+    title: "SpeakWise: Tra nghĩa & Luyện đọc '%s'",
     contexts: ["selection"]
   });
 });
@@ -16,7 +16,19 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// Cache or message routing
+// Shortcut commands listener
+chrome.commands.onCommand.addListener((command) => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs || !tabs[0] || !tabs[0].id) return;
+    if (command === "speakwise-read-selection") {
+      chrome.tabs.sendMessage(tabs[0].id, { action: "shortcut_read_selection" });
+    } else if (command === "speakwise-toggle-panel") {
+      chrome.tabs.sendMessage(tabs[0].id, { action: "shortcut_toggle_panel" });
+    }
+  });
+});
+
+// Cache & Storage coordination
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "save_word") {
     chrome.storage.local.get({ savedWords: [] }, (res) => {
@@ -31,6 +43,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true, count: words.length });
       });
     });
-    return true; // async response
+    return true; // async
   }
 });

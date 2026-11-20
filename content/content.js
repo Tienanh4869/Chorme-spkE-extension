@@ -1,4 +1,4 @@
-// SpeakWise - High Performance In-Page Coach & Phonetic Scorer
+// SpeakWise - High Performance In-Page Coach & Dynamic Content Reader
 (() => {
   let activeTooltip = null;
   let activeSidePanel = null;
@@ -10,15 +10,83 @@
   let isSentenceMode = false;
   let mouseUpTimeout = null;
 
-  // In-Memory LRU Cache for Instant Performance (Zero Network Delay on Repetitive words)
+  // In-Memory LRU Cache
   const translationCache = new Map();
   const dictionaryCache = new Map();
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   /* -------------------------------------------------------------
-     1. Smart Context Extractor
+     1. Robust Text Extraction for Dynamic/Virtual/Shadow DOM Content
   ------------------------------------------------------------- */
+  function getActiveSelectionData() {
+    // 1. Check standard window selection
+    let text = '';
+    let range = null;
+    let rect = null;
+    let context = '';
+
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      text = sel.toString().trim();
+      if (text) {
+        try {
+          range = sel.getRangeAt(0);
+          rect = range.getBoundingClientRect();
+          context = getSurroundingSentence(sel);
+        } catch (e) {}
+      }
+    }
+
+    // 2. Check active input/textarea/contenteditable or shadowRoot
+    if (!text) {
+      let activeEl = document.activeElement;
+      // Handle Shadow DOM active element
+      while (activeEl && activeEl.shadowRoot && activeEl.shadowRoot.activeElement) {
+        activeEl = activeEl.shadowRoot.activeElement;
+      }
+
+      if (activeEl) {
+        if (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') {
+          const start = activeEl.selectionStart;
+          const end = activeEl.selectionEnd;
+          if (typeof start === 'number' && typeof end === 'number' && start !== end) {
+            text = activeEl.value.substring(start, end).trim();
+            rect = activeEl.getBoundingClientRect();
+            context = activeEl.value;
+          }
+        } else if (activeEl.isContentEditable) {
+          text = (activeEl.innerText || activeEl.textContent || '').trim();
+          rect = activeEl.getBoundingClientRect();
+          context = text;
+        }
+      }
+    }
+
+    // 3. Check open Shadow DOMs if window.getSelection() is empty
+    if (!text && document.querySelectorAll) {
+      const shadowHosts = document.querySelectorAll('*');
+      for (let i = 0; i < shadowHosts.length; i++) {
+        const root = shadowHosts[i].shadowRoot;
+        if (root && root.getSelection) {
+          const shadowSel = root.getSelection();
+          if (shadowSel && shadowSel.rangeCount > 0) {
+            const shadowText = shadowSel.toString().trim();
+            if (shadowText) {
+              text = shadowText;
+              range = shadowSel.getRangeAt(0);
+              rect = range.getBoundingClientRect();
+              context = shadowText;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return { text, range, rect, context };
+  }
+
   function getSurroundingSentence(selection) {
     try {
       if (!selection.rangeCount) return '';
@@ -126,7 +194,6 @@
         repaired: analysis.repairedText
       };
 
-      // Store in LRU cache
       if (translationCache.size > 200) translationCache.clear();
       translationCache.set(cacheKey, result);
 
@@ -142,9 +209,10 @@
   }
 
   /* -------------------------------------------------------------
-     4. Floating Selection Pill with Debounce
+     4. Dynamic Selection Pill & Multiple Event Listeners
   ------------------------------------------------------------- */
   let selectionPill = null;
+  let lastSelectionData = null;
 
   function initSelectionListener() {
     selectionPill = document.createElement('div');
@@ -154,50 +222,55 @@
       <span class="sp-pill-text">SpeakWise Dịch & Luyện</span>
     `;
     selectionPill.style.display = 'none';
-    document.documentElement.appendChild(selectionPill);
+    (document.body || document.documentElement).appendChild(selectionPill);
 
     selectionPill.addEventListener('mousedown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const sel = window.getSelection();
-      const text = sel.toString().trim();
-      const context = getSurroundingSentence(sel);
-      if (text) {
-        const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
+      const selData = getActiveSelectionData();
+      const currentData = (selData && selData.text) ? selData : lastSelectionData;
+      if (currentData && currentData.text) {
         selectionPill.style.display = 'none';
-        showInlineTooltip(text, context, rect);
+        showInlineTooltip(currentData.text, currentData.context, currentData.rect);
       }
     });
 
+    const handleSelectionChange = () => {
+      clearTimeout(mouseUpTimeout);
+      mouseUpTimeout = setTimeout(() => {
+        const selData = getActiveSelectionData();
+        const text = selData.text;
+
+        if (text && text.length > 1 && text.length <= 600) {
+          lastSelectionData = selData;
+          const rect = selData.rect;
+          if (rect && (rect.width > 0 || rect.height > 0)) {
+            const pillWidth = 140;
+            const leftPos = Math.max(10, Math.min(window.innerWidth - pillWidth - 10, window.scrollX + rect.left + (rect.width / 2) - (pillWidth / 2)));
+            const topPos = Math.max(window.scrollY + 10, window.scrollY + rect.top - 42);
+
+            selectionPill.style.top = `${topPos}px`;
+            selectionPill.style.left = `${leftPos}px`;
+            selectionPill.style.display = 'inline-flex';
+            return;
+          }
+        }
+        if (selectionPill) selectionPill.style.display = 'none';
+      }, 60);
+    };
+
+    // Support both mouseup and selectionchange for SPA/Ajax/Infinite Scroll dynamic content
     document.addEventListener('mouseup', (e) => {
       if (activeTooltip && activeTooltip.contains(e.target)) return;
       if (activeSidePanel && activeSidePanel.contains(e.target)) return;
       if (selectionPill && selectionPill.contains(e.target)) return;
+      handleSelectionChange();
+    });
 
-      clearTimeout(mouseUpTimeout);
-      mouseUpTimeout = setTimeout(() => {
-        const sel = window.getSelection();
-        const text = sel ? sel.toString().trim() : '';
-
-        if (text && text.length > 1 && text.length <= 600) {
-          try {
-            const range = sel.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-              const pillWidth = 140;
-              const leftPos = Math.max(10, Math.min(window.innerWidth - pillWidth - 10, window.scrollX + rect.left + (rect.width / 2) - (pillWidth / 2)));
-              const topPos = Math.max(window.scrollY + 10, window.scrollY + rect.top - 42);
-
-              selectionPill.style.top = `${topPos}px`;
-              selectionPill.style.left = `${leftPos}px`;
-              selectionPill.style.display = 'inline-flex';
-              return;
-            }
-          } catch (err) {}
-        }
-        if (selectionPill) selectionPill.style.display = 'none';
-      }, 50);
+    document.addEventListener('selectionchange', () => {
+      // If modal is open, don't auto show pill
+      if (activeTooltip || (activeSidePanel && activeSidePanel.classList.contains('visible'))) return;
+      handleSelectionChange();
     });
 
     document.addEventListener('mousedown', (e) => {
@@ -205,6 +278,15 @@
         removeInlineTooltip();
       }
     });
+
+    // Handle dynamic updates via MutationObserver
+    const observer = new MutationObserver(() => {
+      // Ensure pill is in DOM if SPA wiped body
+      if (selectionPill && !document.contains(selectionPill)) {
+        (document.body || document.documentElement).appendChild(selectionPill);
+      }
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
   }
 
   /* -------------------------------------------------------------
@@ -214,7 +296,7 @@
     removeInlineTooltip();
     const cleanText = rawText.trim();
     currentTargetText = cleanText;
-    currentSurroundingContext = context;
+    currentSurroundingContext = context || '';
 
     const wordsCount = cleanText.split(/\s+/).length;
     isSentenceMode = wordsCount > 2 || cleanText.includes('.') || cleanText.includes('?') || cleanText.includes('!');
@@ -228,8 +310,10 @@
     const tipWidth = isSentenceMode ? 430 : 350;
     const tipEstimatedHeight = 280;
 
-    // Viewport-aware boundary collision check
-    let leftPos = window.scrollX + targetRect.left;
+    const baseLeft = targetRect ? targetRect.left : 100;
+    const baseTop = targetRect ? targetRect.bottom : 100;
+
+    let leftPos = window.scrollX + baseLeft;
     if (leftPos + tipWidth > window.scrollX + window.innerWidth - 15) {
       leftPos = window.scrollX + window.innerWidth - tipWidth - 15;
     }
@@ -237,9 +321,8 @@
       leftPos = window.scrollX + 10;
     }
 
-    let topPos = window.scrollY + targetRect.bottom + 8;
-    // If tooltip overflows bottom of screen, flip it above the selected text
-    if (targetRect.bottom + tipEstimatedHeight > window.innerHeight && targetRect.top > tipEstimatedHeight) {
+    let topPos = window.scrollY + baseTop + 8;
+    if (targetRect && targetRect.bottom + tipEstimatedHeight > window.innerHeight && targetRect.top > tipEstimatedHeight) {
       topPos = window.scrollY + targetRect.top - tipEstimatedHeight - 8;
     }
 
@@ -292,7 +375,6 @@
             </div>
           </div>
           <div class="sp-heard-text" id="sp-tip-heard-text"></div>
-          <!-- Word Breakdown Visualizer -->
           <div class="sp-word-breakdown" id="sp-tip-word-breakdown" style="display:none;"></div>
         </div>
 
@@ -303,7 +385,7 @@
       </div>
     `;
 
-    document.documentElement.appendChild(activeTooltip);
+    (document.body || document.documentElement).appendChild(activeTooltip);
 
     // Event Bindings
     document.getElementById('sp-tip-close-btn').addEventListener('click', removeInlineTooltip);
@@ -429,7 +511,7 @@
         </div>
       `;
 
-      document.documentElement.appendChild(activeSidePanel);
+      (document.body || document.documentElement).appendChild(activeSidePanel);
 
       document.getElementById('sp-panel-close-btn').addEventListener('click', closeSidePanel);
       document.getElementById('sp-panel-pin-btn').addEventListener('click', togglePinPanel);
@@ -708,7 +790,6 @@
     }
   }
 
-  // Enhanced Word-Level Breakdown & Similarity Calculation
   function gradeSpeech(target, spoken, uiMode) {
     const prefix = uiMode === 'tip' ? 'sp-tip' : 'sp-panel';
     const scoreBox = document.getElementById(`${prefix}-score-box`);
@@ -725,12 +806,10 @@
     const targetWords = target.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "").split(/\s+/).filter(Boolean);
     const spokenWords = spoken.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?'"]/g, "").split(/\s+/).filter(Boolean);
 
-    // Calculate word-level accuracy
     let correctCount = 0;
     let breakdownHtml = '<div class="sp-breakdown-title">Chi tiết từng từ bạn đọc:</div><div class="sp-words-chips">';
 
     targetWords.forEach(tWord => {
-      // Check exact match or phonetic similarity
       const hasMatch = spokenWords.some(sWord => calculateSimilarity(tWord, sWord) >= 0.75);
       if (hasMatch) {
         correctCount++;
@@ -812,15 +891,17 @@
     if (req.action === "open_modal" && req.text) {
       openSidePanel(req.text, '');
     } else if (req.action === "shortcut_read_selection") {
-      const selText = window.getSelection().toString().trim();
-      if (selText) {
-        playPronunciation(selText, 1.0);
+      const selData = getActiveSelectionData();
+      const textToRead = selData.text || window.getSelection().toString().trim();
+      if (textToRead) {
+        playPronunciation(textToRead, 1.0);
       }
     } else if (req.action === "shortcut_toggle_panel") {
       if (activeSidePanel && activeSidePanel.classList.contains('visible')) {
         closeSidePanel();
       } else {
-        const selText = window.getSelection().toString().trim();
+        const selData = getActiveSelectionData();
+        const selText = selData.text || window.getSelection().toString().trim();
         openSidePanel(selText || 'Hello', '');
       }
     }

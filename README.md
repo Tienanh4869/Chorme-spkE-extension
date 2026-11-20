@@ -1,36 +1,53 @@
-# SpeakWise - Pronunciation & Vocabulary Speaking Coach Extension
+# SpeakWise - Pronunciation, Vocabulary & Speaking Coach Extension
 
-**SpeakWise** is a Chrome/Edge Manifest V3 browser extension engineered to be significantly better than Google Translate for **language learners**, **pronunciation training**, and **speaking mastery**.
-
----
-
-## 🌟 Why is it Better than Google Translate?
-
-| Feature | Google Translate | SpeakWise |
-| :--- | :--- | :--- |
-| **Speaking Evaluation** | ❌ No pronunciation check / score | ✅ **Real-time Voice Recognition & Scoring (0–100%)** |
-| **Phonetics** | ⚠️ Often missing or hidden | ✅ **Full IPA (International Phonetic Alphabet)** |
-| **Audio Speed** | ⚠️ Limited control | ✅ **Dual Speeds: 1.0x Normal & 0.6x Slow Syllable audio** |
-| **In-context Learning** | ❌ Translates isolated words | ✅ **Parts of Speech, Definitions, Example Sentences, & Synonyms** |
-| **Vocabulary Retention** | ❌ Generic phrasebook | ✅ **Personal Notebook & Flashcards** directly saved with 1 click |
-| **Browser Integration** | ❌ Copy-pasting back and forth | ✅ **Floating action pill on text selection & right-click context menu** |
+**SpeakWise** là tiện ích mở rộng (Manifest V3) trên Chrome / Edge / Brave được thiết kế chuyên sâu dành cho **người học tiếng Anh**. Extension kết hợp tra cứu ngữ cảnh, dịch nghĩa tiếng Việt chi tiết, phiên âm IPA chuẩn xác, luyện phát âm trực tiếp với công nghệ nhận diện giọng nói và sổ tay từ vựng thông minh.
 
 ---
 
-## 📁 Project Structure
+## 🌟 Tính Năng Nổi Bật
+
+- 🎙️ **Luyện nói & Chấm điểm phát âm tức thì (Speech Recognition & Scorer)**:
+  - Bấm micro và phát âm trực tiếp từ hoặc cả câu văn ngay trên website.
+  - Phân tích chi tiết từng từ: đánh dấu từ đọc chuẩn (`✓ xanh`) và từ cần cải thiện (`✗ đỏ`), kèm điểm số tổng thể từ 0% đến 100%.
+
+- 🇻🇳 **Dịch nghĩa tiếng Việt chi tiết & Phân loại từ loại**:
+  - Cung cấp nghĩa tiếng Việt trọng tâm và các tầng nghĩa đồng nghĩa.
+  - Phân loại rõ ràng các từ loại như *[Danh từ]*, *[Động từ]*, *[Tính từ]*, *[Trạng từ]*.
+
+- ✨ **Dịch thông minh theo ngữ cảnh (Smart Context Deduction)**:
+  - Tự động đọc ngữ cảnh đoạn văn xung quanh câu đã chọn.
+  - Hỗ trợ suy luận các câu bị khuyết từ (placeholder như `...`, `___`) và tự động chuẩn hóa lỗi ngữ pháp thường gặp.
+
+- 🔊 **Nghe phát âm đa tốc độ (Dual Speed Native Audio)**:
+  - Chế độ **1.0x (Chuẩn bản ngữ)** và **0.6x (Chậm)** giúp người học nghe rõ từng âm tiết, âm đuôi (*ending sounds* như /s/, /t/, /d/) và ngữ điệu câu.
+
+- 🌐 **Hỗ trợ toàn diện nội dung động (Dynamic Content Ready)**:
+  - Hoạt động mượt mà trên các nền tảng Single Page Apps (React, Vue), Web Components / Shadow DOM (YouTube, Reddit, Twitter/X) và các khung nhúng iframe.
+
+- ⌨️ **Phím tắt tiện lợi (Keyboard Shortcuts)**:
+  - **`Alt + S`**: Phát âm nhanh đoạn văn bản đang bôi đen.
+  - **`Alt + W`**: Bật / tắt thanh bên Side Panel để tra cứu song song với nội dung trang web.
+
+- 📚 **Sổ tay từ vựng & Flashcards cá nhân**:
+  - Lưu từ và câu yêu thích chỉ với 1 click (`⭐ Lưu từ`).
+  - Hỗ trợ xuất dữ liệu ra file **CSV (Excel / Anki / Quizlet)** để ôn tập mọi lúc mọi nơi.
+
+---
+
+## 📁 Cấu Trúc Dự Án
 
 ```
 d:\extension\
-│── manifest.json             # Manifest V3 configuration
+│── manifest.json             # Cấu hình Manifest V3 & quyền hạn extension
 │── background\
-│   └── background.js         # Context menu & storage coordination
+│   └── background.js         # Service worker quản lý context menu & phím tắt
 │── content\
-│   ├── content.js            # In-page interactive modal, voice recognition & scorer
-│   └── content.css           # Clean modern UI styling
+│   ├── content.js            # Trích xuất văn bản động, UI Tooltip, Side Panel & chấm điểm giọng nói
+│   └── content.css           # Giao diện trực quan, hỗ trợ chống tràn màn hình
 │── popup\
-│   ├── popup.html            # Extension popup dashboard & flashcard review
-│   ├── popup.js              # Quick search, voice test & saved vocabulary manager
-│   └── popup.css             # Popup interface styling
+│   ├── popup.html            # Giao diện popup dashboard ôn tập flashcard
+│   ├── popup.js              # Logic tra cứu nhanh, kiểm tra giọng & xuất CSV
+│   └── popup.css             # Định dạng phong cách popup
 │── icons\
 │   ├── icon16.png
 │   ├── icon48.png
@@ -41,31 +58,30 @@ d:\extension\
 
 ---
 
-## 🚀 How to Install and Test in Chrome / Edge / Brave
+## 🚀 Hướng Dẫn Cài Đặt và Sử Dụng
 
-1. Open your browser and navigate to the Extensions page:
+### 1. Cài đặt trên Chrome / Edge / Brave
+1. Mở trình duyệt và truy cập trang quản lý tiện ích:
    - **Chrome**: `chrome://extensions/`
    - **Edge**: `edge://extensions/`
    - **Brave**: `brave://extensions/`
-2. Turn ON **"Developer mode"** (toggle in the top-right corner).
-3. Click the **"Load unpacked"** button.
-4. Select the directory: `D:\extension`
-5. The **SpeakWise** extension is now installed and active!
+2. Bật chế độ **Developer mode** (Chế độ dành cho nhà phát triển ở góc trên bên phải).
+3. Nhấp vào nút **Load unpacked** (Tải tiện ích đã giải nén).
+4. Chọn thư mục dự án: `D:\extension`
+5. Tiện ích **SpeakWise** đã sẵn sàng hoạt động!
 
 ---
 
-## 💡 How to Use
-
-1. **Highlighting text on any website**:
-   - Select any word while reading an article.
-   - Click the floating **🎙️ SpeakWise** button (or right-click and select *"SpeakWise: Practice & Learn"*).
-   - An interactive pronunciation card appears right over the page.
-2. **Audio & Syllables**:
-   - Click **🔊 Normal** to hear native pronunciation.
-   - Click **🐢 Slow (0.6x)** to dissect difficult syllables.
-3. **Speaking Accuracy Test**:
-   - Click **🎤 Start Speaking** and pronounce the word into your microphone.
-   - SpeakWise analyzes your speech and gives you an accuracy percentage (e.g. `95% - Native level clarity`) with immediate feedback!
-4. **Vocabulary Notebook**:
-   - Click **⭐ Save Word** to store it.
-   - Click the extension icon in the toolbar anytime to review your saved vocabulary list, play pronunciation audio, or look up new terms.
+### 2. Cách sử dụng hàng ngày
+1. **Tra cứu & Nghe phát âm trực tiếp trên website**:
+   - Bôi đen một từ hoặc câu văn tiếng Anh trên bất kỳ trang web nào.
+   - Nhấp vào nút nổi **✨ SpeakWise Dịch & Luyện** (hoặc nhấn phím tắt **`Alt + S`**).
+2. **Luyện phát âm & Kiểm tra điểm số**:
+   - Nhấp vào nút **🎤 Bấm để nói** trên thẻ nổi.
+   - Đọc to từ hoặc câu vào micro để xem phản hồi và điểm phát âm chi tiết.
+3. **Thanh bên tra cứu nâng cao**:
+   - Nhấp biểu tượng mở rộng `⤢` (hoặc nhấn **`Alt + W`**) để mở thanh bên Side Panel.
+   - Bấm **📌 Ghim** để vừa đọc tài liệu vừa tra cứu từ mà không bị che nội dung trang web.
+4. **Quản lý & Xuất từ vựng**:
+   - Nhấp vào biểu tượng SpeakWise trên thanh công cụ trình duyệt để mở sổ tay từ vựng.
+   - Nhấp **📥 Xuất CSV** để lưu về máy và ôn tập trên Excel hoặc Anki.

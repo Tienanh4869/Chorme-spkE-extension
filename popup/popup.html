@@ -28,7 +28,13 @@
     <div id="practice-tab" class="tab-content active">
       <div class="search-box">
         <textarea id="quick-input" rows="2" placeholder="Nhập từ hoặc câu tiếng Anh (phím tắt: Alt+S nghe nhanh, Alt+W mở bảng)..."></textarea>
-        <button id="quick-search-btn">Tra Nghĩa & Luyện Đọc</button>
+        <div class="search-actions-row">
+          <label class="ocr-upload-btn" title="Tải ảnh lên để quét chữ (OCR)">
+            📷 Quét chữ từ ảnh
+            <input type="file" id="ocr-file-input" accept="image/*" style="display:none;" />
+          </label>
+          <button id="quick-search-btn">Tra Nghĩa & Luyện Đọc</button>
+        </div>
       </div>
 
       <div id="quick-result" class="result-card" style="display: none;">

@@ -213,6 +213,7 @@
   ------------------------------------------------------------- */
   let selectionPill = null;
   let lastSelectionData = null;
+  let ocrImageButton = null;
 
   function initSelectionListener() {
     selectionPill = document.createElement('div');
@@ -223,6 +224,47 @@
     `;
     selectionPill.style.display = 'none';
     (document.body || document.documentElement).appendChild(selectionPill);
+
+    // Hover button for images to trigger OCR
+    ocrImageButton = document.createElement('div');
+    ocrImageButton.id = 'speakwise-image-pill';
+    ocrImageButton.innerHTML = `
+      <span class="sp-pill-icon">📷</span>
+      <span class="sp-pill-text">Quét chữ trong ảnh</span>
+    `;
+    ocrImageButton.style.display = 'none';
+    (document.body || document.documentElement).appendChild(ocrImageButton);
+
+    let currentHoveredImage = null;
+
+    document.addEventListener('mouseover', (e) => {
+      const target = e.target;
+      if (target && target.tagName === 'IMG' && target.src && !target.src.startsWith('chrome-extension://')) {
+        const rect = target.getBoundingClientRect();
+        if (rect.width >= 50 && rect.height >= 50) {
+          currentHoveredImage = target;
+          const leftPos = Math.max(10, window.scrollX + rect.left + 10);
+          const topPos = Math.max(window.scrollY + 10, window.scrollY + rect.top + 10);
+          ocrImageButton.style.top = `${topPos}px`;
+          ocrImageButton.style.left = `${leftPos}px`;
+          ocrImageButton.style.display = 'inline-flex';
+        }
+      } else if (ocrImageButton && !ocrImageButton.contains(e.target) && target !== currentHoveredImage) {
+        // Hide if moved away from image and not hovering over the pill itself
+        if (!e.relatedTarget || (e.relatedTarget !== currentHoveredImage && !ocrImageButton.contains(e.relatedTarget))) {
+          ocrImageButton.style.display = 'none';
+        }
+      }
+    });
+
+    ocrImageButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (currentHoveredImage) {
+        ocrImageButton.style.display = 'none';
+        triggerImageOCR(currentHoveredImage);
+      }
+    });
 
     selectionPill.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -885,11 +927,57 @@
   }
 
   /* -------------------------------------------------------------
-     11. Keyboard Shortcuts & Background Listeners
+     11. Image OCR Trigger & Flow
+  ------------------------------------------------------------- */
+  function triggerImageOCR(imgEl, explicitUrl) {
+    const src = explicitUrl || imgEl.src;
+    const rect = imgEl ? imgEl.getBoundingClientRect() : { left: window.innerWidth / 2 - 100, top: 100, bottom: 120, width: 200, height: 100 };
+
+    // Show inline loading state
+    showInlineTooltip('Đang quét chữ trong hình ảnh...', '', rect);
+    const primaryEl = document.getElementById('sp-tip-vn-primary');
+    if (primaryEl) primaryEl.innerHTML = '<div class="sp-loading-spinner"></div> Đang nhận diện ký tự & câu văn qua OCR...';
+
+    // Try canvas extraction first (handles cross-origin if permitted or data URI)
+    let dataUrl = null;
+    if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = imgEl.naturalWidth;
+        canvas.height = imgEl.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(imgEl, 0, 0);
+        dataUrl = canvas.toDataURL('image/png');
+      } catch (err) {
+        // Cross-origin canvas security, will fallback to imageUrl
+        dataUrl = null;
+      }
+    }
+
+    const payload = dataUrl ? { action: "perform_ocr", dataUrl: dataUrl } : { action: "perform_ocr", imageUrl: src };
+
+    chrome.runtime.sendMessage(payload, (response) => {
+      if (response && response.success && response.text) {
+        showInlineTooltip(response.text, '', rect);
+      } else {
+        const err = (response && response.error) || 'Không thể quét chữ từ ảnh này.';
+        if (primaryEl) {
+          primaryEl.innerHTML = `<span style="color:#dc2626;">⚠️ ${err}</span>`;
+        }
+      }
+    });
+  }
+
+  /* -------------------------------------------------------------
+     12. Keyboard Shortcuts & Background Listeners
   ------------------------------------------------------------- */
   chrome.runtime.onMessage.addListener((req) => {
     if (req.action === "open_modal" && req.text) {
       openSidePanel(req.text, '');
+    } else if (req.action === "ocr_image_url" && req.imageUrl) {
+      // Find matching img on page if possible
+      const img = Array.from(document.querySelectorAll('img')).find(i => i.src === req.imageUrl);
+      triggerImageOCR(img, req.imageUrl);
     } else if (req.action === "shortcut_read_selection") {
       const selData = getActiveSelectionData();
       const textToRead = selData.text || window.getSelection().toString().trim();

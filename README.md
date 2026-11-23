@@ -6,6 +6,11 @@
 
 ## 🌟 Tính Năng Nổi Bật
 
+- 📷 **Nhận diện chữ & câu văn trong ảnh (Image OCR Text Detection)**:
+  - Tự động nhận diện chữ, ký tự và cả câu văn tiếng Anh từ hình ảnh trên web.
+  - Rê chuột vào ảnh bất kỳ để xuất hiện nút **`📷 Quét chữ trong ảnh`**, hoặc nhấp chuột phải chọn **"SpeakWise: 📷 Quét chữ & Luyện phát âm từ ảnh này"**.
+  - Tích hợp sẵn trong Popup: Cho phép tải ảnh trực tiếp từ máy tính để trích xuất văn bản, dịch nghĩa và luyện đọc.
+
 - 🎙️ **Luyện nói & Chấm điểm phát âm tức thì (Speech Recognition & Scorer)**:
   - Bấm micro và phát âm trực tiếp từ hoặc cả câu văn ngay trên website.
   - Phân tích chi tiết từng từ: đánh dấu từ đọc chuẩn (`✓ xanh`) và từ cần cải thiện (`✗ đỏ`), kèm điểm số tổng thể từ 0% đến 100%.

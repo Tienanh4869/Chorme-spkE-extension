@@ -29,6 +29,33 @@
   transform: scale(1.06);
 }
 
+/* 1b. Floating Image OCR Pill */
+#speakwise-image-pill {
+  position: absolute;
+  z-index: 2147483645;
+  background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+  color: #ffffff;
+  padding: 5px 12px;
+  border-radius: 18px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 4px 14px rgba(4, 120, 87, 0.35);
+  cursor: pointer;
+  user-select: none;
+  animation: sp-pop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: transform 0.15s ease, background 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#speakwise-image-pill:hover {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  transform: scale(1.06);
+}
+
 @keyframes sp-pop {
   from { opacity: 0; transform: scale(0.85); }
   to { opacity: 1; transform: scale(1); }

@@ -49,6 +49,34 @@ document.addEventListener('DOMContentLoaded', () => {
   // Export CSV
   document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
 
+  // OCR Upload from file input
+  const fileInput = document.getElementById('ocr-file-input');
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const inputArea = document.getElementById('quick-input');
+      inputArea.value = 'Đang nhận diện ký tự & câu văn trong ảnh...';
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target.result;
+        chrome.runtime.sendMessage({ action: "perform_ocr", dataUrl: dataUrl }, (res) => {
+          if (res && res.success && res.text) {
+            inputArea.value = res.text;
+            processInput(res.text);
+          } else {
+            const err = (res && res.error) || 'Không thể nhận diện chữ từ ảnh này.';
+            alert('Lỗi OCR: ' + err);
+            inputArea.value = '';
+          }
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   // Clear all
   document.getElementById('clear-all-btn').addEventListener('click', () => {
     if (confirm('Xóa toàn bộ từ và câu đã lưu trong sổ?')) {

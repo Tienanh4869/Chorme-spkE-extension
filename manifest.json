@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "SpeakWise - Pronunciation & Vocabulary Coach",
-  "version": "1.3.0",
-  "description": "Learn pronunciation, vocabulary, IPA phonetics, definitions, image OCR text extraction, and practice speaking with speech recognition scoring.",
+  "version": "1.4.0",
+  "description": "Learn pronunciation, vocabulary, IPA phonetics, definitions, crop/snip screen OCR for images/PDFs, and practice speaking with speech recognition scoring.",
   "permissions": [
     "storage",
     "contextMenus",
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
   "commands": {
     "speakwise-read-selection": {
@@ -22,6 +23,13 @@
         "mac": "Alt+W"
       },
       "description": "Bật/tắt thanh bên SpeakWise"
+    },
+    "speakwise-capture-ocr": {
+      "suggested_key": {
+        "default": "Alt+Q",
+        "mac": "Alt+Q"
+      },
+      "description": "Chụp quét chữ trên màn hình (PDF, Ảnh trực tiếp)"
     }
   },
   "action": {

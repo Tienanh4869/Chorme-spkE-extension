@@ -969,15 +969,153 @@
   }
 
   /* -------------------------------------------------------------
-     12. Keyboard Shortcuts & Background Listeners
+     12. Screen Snipping & Cropping Tool (Cho PDF, Tab mở ảnh, Web)
+  ------------------------------------------------------------- */
+  let snipOverlay = null;
+
+  function initScreenSnipping(screenshotUrl) {
+    if (snipOverlay) snipOverlay.remove();
+
+    snipOverlay = document.createElement('div');
+    snipOverlay.id = 'speakwise-snip-overlay';
+    snipOverlay.innerHTML = `
+      <div class="sp-snip-instruction">
+        ✂️ <strong>Kéo chuột để khoanh vùng chữ cần đọc trong ảnh / PDF</strong> (Nhấn <strong>ESC</strong> để hủy)
+      </div>
+      <div id="sp-snip-box" class="sp-snip-box" style="display:none;"></div>
+    `;
+
+    document.documentElement.appendChild(snipOverlay);
+
+    const snipBox = document.getElementById('sp-snip-box');
+    let startX = 0, startY = 0, isDragging = false;
+
+    const onMouseDown = (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      snipBox.style.left = `${startX}px`;
+      snipBox.style.top = `${startY}px`;
+      snipBox.style.width = '0px';
+      snipBox.style.height = '0px';
+      snipBox.style.display = 'block';
+    };
+
+    const onMouseMove = (e) => {
+      if (!isDragging) return;
+      const currentX = e.clientX;
+      const currentY = e.clientY;
+      const x = Math.min(startX, currentX);
+      const y = Math.min(startY, currentY);
+      const width = Math.abs(currentX - startX);
+      const height = Math.abs(currentY - startY);
+
+      snipBox.style.left = `${x}px`;
+      snipBox.style.top = `${y}px`;
+      snipBox.style.width = `${width}px`;
+      snipBox.style.height = `${height}px`;
+    };
+
+    const onMouseUp = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+
+      const endX = e.clientX;
+      const endY = e.clientY;
+      const cropX = Math.min(startX, endX);
+      const cropY = Math.min(startY, endY);
+      const cropWidth = Math.abs(endX - startX);
+      const cropHeight = Math.abs(endY - startY);
+
+      // Clean up overlay
+      cleanupSnipping();
+
+      if (cropWidth > 15 && cropHeight > 10) {
+        cropAndProcessScreenshot(screenshotUrl, cropX, cropY, cropWidth, cropHeight);
+      }
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        cleanupSnipping();
+      }
+    };
+
+    function cleanupSnipping() {
+      if (snipOverlay) {
+        snipOverlay.remove();
+        snipOverlay = null;
+      }
+      document.removeEventListener('keydown', onKeyDown);
+    }
+
+    snipOverlay.addEventListener('mousedown', onMouseDown);
+    snipOverlay.addEventListener('mousemove', onMouseMove);
+    snipOverlay.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('keydown', onKeyDown);
+  }
+
+  function cropAndProcessScreenshot(screenshotUrl, x, y, width, height) {
+    const dpr = window.devicePixelRatio || 1;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      const ctx = canvas.getContext('2d');
+
+      // Crop the selected region
+      ctx.drawImage(
+        img,
+        x * dpr,
+        y * dpr,
+        width * dpr,
+        height * dpr,
+        0,
+        0,
+        width * dpr,
+        height * dpr
+      );
+
+      const croppedDataUrl = canvas.toDataURL('image/png');
+      const targetRect = {
+        left: x,
+        top: y,
+        bottom: y + height,
+        width: width,
+        height: height
+      };
+
+      // Show inline tooltip with loading
+      showInlineTooltip('Đang quét chữ trong vùng chọn...', '', targetRect);
+      const primaryEl = document.getElementById('sp-tip-vn-primary');
+      if (primaryEl) primaryEl.innerHTML = '<div class="sp-loading-spinner"></div> Đang nhận diện câu/chữ qua OCR...';
+
+      chrome.runtime.sendMessage({ action: "perform_ocr", dataUrl: croppedDataUrl }, (res) => {
+        if (res && res.success && res.text) {
+          showInlineTooltip(res.text, '', targetRect);
+        } else {
+          const err = (res && res.error) || 'Không tìm thấy chữ hoặc câu nào trong vùng vừa chọn.';
+          if (primaryEl) {
+            primaryEl.innerHTML = `<span style="color:#dc2626;">⚠️ ${err}</span>`;
+          }
+        }
+      });
+    };
+    img.src = screenshotUrl;
+  }
+
+  /* -------------------------------------------------------------
+     13. Keyboard Shortcuts & Background Listeners
   ------------------------------------------------------------- */
   chrome.runtime.onMessage.addListener((req) => {
     if (req.action === "open_modal" && req.text) {
       openSidePanel(req.text, '');
     } else if (req.action === "ocr_image_url" && req.imageUrl) {
-      // Find matching img on page if possible
       const img = Array.from(document.querySelectorAll('img')).find(i => i.src === req.imageUrl);
       triggerImageOCR(img, req.imageUrl);
+    } else if (req.action === "start_snip_capture" && req.screenshotUrl) {
+      initScreenSnipping(req.screenshotUrl);
     } else if (req.action === "shortcut_read_selection") {
       const selData = getActiveSelectionData();
       const textToRead = selData.text || window.getSelection().toString().trim();

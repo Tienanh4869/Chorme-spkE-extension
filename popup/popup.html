@@ -29,10 +29,15 @@
       <div class="search-box">
         <textarea id="quick-input" rows="2" placeholder="Nhập từ hoặc câu tiếng Anh (phím tắt: Alt+S nghe nhanh, Alt+W mở bảng)..."></textarea>
         <div class="search-actions-row">
-          <label class="ocr-upload-btn" title="Tải ảnh lên để quét chữ (OCR)">
-            📷 Quét chữ từ ảnh
-            <input type="file" id="ocr-file-input" accept="image/*" style="display:none;" />
-          </label>
+          <div class="ocr-buttons-group">
+            <button type="button" id="snip-screen-btn" class="ocr-action-btn" title="Khoanh vùng chụp chữ trên màn hình / PDF / Tab ảnh (Alt+Q)">
+              ✂️ Khoanh vùng (PDF/Ảnh)
+            </button>
+            <label class="ocr-upload-btn" title="Tải ảnh lên từ máy tính">
+              📁 Tải ảnh
+              <input type="file" id="ocr-file-input" accept="image/*" style="display:none;" />
+            </label>
+          </div>
           <button id="quick-search-btn">Tra Nghĩa & Luyện Đọc</button>
         </div>
       </div>

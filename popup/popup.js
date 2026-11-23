@@ -77,6 +77,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Screen Snipping trigger from popup
+  const snipBtn = document.getElementById('snip-screen-btn');
+  if (snipBtn) {
+    snipBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: "trigger_screen_snip" });
+      window.close(); // Close popup so user can snip the underlying webpage/PDF/image tab
+    });
+  }
+
   // Clear all
   document.getElementById('clear-all-btn').addEventListener('click', () => {
     if (confirm('Xóa toàn bộ từ và câu đã lưu trong sổ?')) {

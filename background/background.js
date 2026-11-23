@@ -13,6 +13,13 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "SpeakWise: 📷 Quét chữ & Luyện phát âm từ ảnh này",
     contexts: ["image"]
   });
+
+  // Context menu for capturing visible area on PDF / Full Image tab / Web
+  chrome.contextMenus.create({
+    id: "speakwise-capture-screen",
+    title: "SpeakWise: ✂️ Khoanh vùng quét chữ (PDF / Ảnh đang mở / Web)",
+    contexts: ["page", "frame"]
+  });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -26,6 +33,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       action: "ocr_image_url",
       imageUrl: info.srcUrl
     });
+  } else if (info.menuItemId === "speakwise-capture-screen") {
+    triggerSnippingTool(tab.id);
   }
 });
 
@@ -37,15 +46,31 @@ chrome.commands.onCommand.addListener((command) => {
       chrome.tabs.sendMessage(tabs[0].id, { action: "shortcut_read_selection" });
     } else if (command === "speakwise-toggle-panel") {
       chrome.tabs.sendMessage(tabs[0].id, { action: "shortcut_toggle_panel" });
+    } else if (command === "speakwise-capture-ocr") {
+      triggerSnippingTool(tabs[0].id);
     }
   });
 });
+
+// Capture visible tab screenshot & start interactive snipping in content script
+function triggerSnippingTool(tabId) {
+  chrome.tabs.captureVisibleTab(null, { format: "png" }, (screenshotUrl) => {
+    if (chrome.runtime.lastError || !screenshotUrl) {
+      console.warn("Capture tab failed:", chrome.runtime.lastError);
+      return;
+    }
+    chrome.tabs.sendMessage(tabId, {
+      action: "start_snip_capture",
+      screenshotUrl: screenshotUrl
+    });
+  });
+}
 
 // OCR Helper function using OCR Space API
 async function performOCR(imageUrl, base64Blob) {
   try {
     const formData = new FormData();
-    formData.append("apikey", "K83617342888957"); // High reliability free tier key with fallback
+    formData.append("apikey", "K83617342888957");
     formData.append("language", "eng");
     formData.append("isOverlayRequired", "false");
     formData.append("detectOrientation", "true");
@@ -65,7 +90,6 @@ async function performOCR(imageUrl, base64Blob) {
     });
 
     if (!res.ok) {
-      // Fallback with demo key if needed
       formData.set("apikey", "helloworld");
       const fallbackRes = await fetch("https://api.ocr.space/parse/image", {
         method: "POST",
@@ -85,13 +109,12 @@ async function performOCR(imageUrl, base64Blob) {
 function processOCRResult(data) {
   if (data && data.ParsedResults && data.ParsedResults.length > 0) {
     let parsedText = data.ParsedResults[0].ParsedText || "";
-    // Clean demo notice if present
     parsedText = parsedText.replace(/\[Note:[^\]]+\]/gi, "").trim();
     if (parsedText) {
       return { success: true, text: parsedText };
     }
   }
-  const errMsg = (data && data.ErrorMessage && data.ErrorMessage[0]) || "Không phát hiện được chữ hoặc câu nào trong ảnh này.";
+  const errMsg = (data && data.ErrorMessage && data.ErrorMessage[0]) || "Không phát hiện được chữ hoặc câu nào trong vùng này.";
   return { success: false, error: errMsg };
 }
 
@@ -110,10 +133,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true, count: words.length });
       });
     });
-    return true; // async
+    return true;
   } else if (request.action === "perform_ocr") {
     if (request.dataUrl) {
-      // Convert dataUrl to Blob
       fetch(request.dataUrl)
         .then(r => r.blob())
         .then(blob => performOCR(null, blob))
@@ -126,5 +148,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .catch(e => sendResponse({ success: false, error: e.message }));
       return true;
     }
+  } else if (request.action === "trigger_screen_snip") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs && tabs[0] && tabs[0].id) {
+        triggerSnippingTool(tabs[0].id);
+      }
+    });
   }
 });

@@ -6,6 +6,13 @@
 
 ## 🌟 Tính Năng Nổi Bật
 
+- ✂️ **Khoanh vùng quét chữ trên màn hình (PDF Viewer & Tab mở ảnh trực tiếp)**:
+  - Khi xem tài liệu **PDF trên web** hoặc mở trực tiếp **tab chứa ảnh** (nơi văn bản không thể bôi đen bình thường), bạn chỉ cần:
+    - Nhấn phím tắt **`Alt + Q`**, hoặc
+    - Chuột phải chọn **"SpeakWise: ✂️ Khoanh vùng quét chữ"**, hoặc
+    - Bấm nút **`✂️ Khoanh vùng (PDF/Ảnh)`** trong Popup.
+  - Kéo chuột khoanh đúng vùng câu hoặc chữ cần đọc. Extension sẽ tự động cắt ảnh, quét chữ (OCR), dịch nghĩa tiếng Việt và cho phép bạn luyện phát âm ngay tại chỗ.
+
 - 📷 **Nhận diện chữ & câu văn trong ảnh (Image OCR Text Detection)**:
   - Tự động nhận diện chữ, ký tự và cả câu văn tiếng Anh từ hình ảnh trên web.
   - Rê chuột vào ảnh bất kỳ để xuất hiện nút **`📷 Quét chữ trong ảnh`**, hoặc nhấp chuột phải chọn **"SpeakWise: 📷 Quét chữ & Luyện phát âm từ ảnh này"**.

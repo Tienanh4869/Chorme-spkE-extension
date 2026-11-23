@@ -1032,12 +1032,15 @@
       <div id="sp-snip-box" class="sp-snip-box" style="display:none;"></div>
     `;
 
-    document.documentElement.appendChild(snipOverlay);
+    // Ensure appended to topmost container
+    (document.fullscreenElement || document.body || document.documentElement).appendChild(snipOverlay);
 
     const snipBox = document.getElementById('sp-snip-box');
     let startX = 0, startY = 0, isDragging = false;
 
     const onMouseDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
@@ -1050,6 +1053,8 @@
 
     const onMouseMove = (e) => {
       if (!isDragging) return;
+      e.preventDefault();
+      e.stopPropagation();
       const currentX = e.clientX;
       const currentY = e.clientY;
       const x = Math.min(startX, currentX);
@@ -1065,6 +1070,8 @@
 
     const onMouseUp = (e) => {
       if (!isDragging) return;
+      e.preventDefault();
+      e.stopPropagation();
       isDragging = false;
 
       const endX = e.clientX;
@@ -1074,7 +1081,6 @@
       const cropWidth = Math.abs(endX - startX);
       const cropHeight = Math.abs(endY - startY);
 
-      // Clean up overlay
       cleanupSnipping();
 
       if (cropWidth > 15 && cropHeight > 10) {
@@ -1084,6 +1090,7 @@
 
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         cleanupSnipping();
       }
     };
@@ -1093,13 +1100,13 @@
         snipOverlay.remove();
         snipOverlay = null;
       }
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown, true);
     }
 
-    snipOverlay.addEventListener('mousedown', onMouseDown);
-    snipOverlay.addEventListener('mousemove', onMouseMove);
-    snipOverlay.addEventListener('mouseup', onMouseUp);
-    document.addEventListener('keydown', onKeyDown);
+    snipOverlay.addEventListener('mousedown', onMouseDown, true);
+    snipOverlay.addEventListener('mousemove', onMouseMove, true);
+    snipOverlay.addEventListener('mouseup', onMouseUp, true);
+    document.addEventListener('keydown', onKeyDown, true);
   }
 
   function cropAndProcessScreenshot(screenshotUrl, x, y, width, height) {

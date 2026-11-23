@@ -57,25 +57,25 @@ chrome.commands.onCommand.addListener((command) => {
 // Capture visible tab screenshot & safely trigger snipping
 function triggerSnippingTool(tabId, delay = 0) {
   setTimeout(() => {
-    // If no tabId passed, get active tab
-    const getTabPromise = tabId 
-      ? Promise.resolve({ id: tabId }) 
-      : chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => tabs[0]);
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = (tabs && tabs[0]) || (tabId ? { id: tabId } : null);
+      if (!activeTab || !activeTab.id) {
+        console.error("No active tab found for snipping");
+        return;
+      }
+      const targetId = activeTab.id;
 
-    getTabPromise.then(tab => {
-      if (!tab || !tab.id) return;
-      const targetId = tab.id;
-
-      chrome.tabs.captureVisibleTab(null, { format: "png" }, (screenshotUrl) => {
+      chrome.tabs.captureVisibleTab(activeTab.windowId, { format: "png" }, (screenshotUrl) => {
         if (chrome.runtime.lastError || !screenshotUrl) {
-          console.warn("Capture tab failed:", chrome.runtime.lastError ? chrome.runtime.lastError.message : "No URL");
+          const err = chrome.runtime.lastError ? chrome.runtime.lastError.message : "No screenshot URL";
+          console.error("Capture tab failed:", err);
           return;
         }
 
-        // Try direct message
+        // Try direct message to content script
         chrome.tabs.sendMessage(targetId, { action: "start_snip_capture", screenshotUrl: screenshotUrl }, (res) => {
           if (chrome.runtime.lastError) {
-            // Content script not yet present, inject dynamically via scripting
+            console.warn("Direct message failed, injecting content script via scripting API...", chrome.runtime.lastError.message);
             if (chrome.scripting) {
               chrome.scripting.executeScript({
                 target: { tabId: targetId },
@@ -88,7 +88,7 @@ function triggerSnippingTool(tabId, delay = 0) {
               }).then(() => {
                 setTimeout(() => {
                   chrome.tabs.sendMessage(targetId, { action: "start_snip_capture", screenshotUrl: screenshotUrl });
-                }, 100);
+                }, 150);
               }).catch(err => {
                 console.error("Scripting injection failed:", err);
               });

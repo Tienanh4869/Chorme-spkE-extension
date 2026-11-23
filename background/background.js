@@ -17,7 +17,7 @@ chrome.runtime.onInstalled.addListener(() => {
   // Context menu for capturing visible area on PDF / Full Image tab / Web
   chrome.contextMenus.create({
     id: "speakwise-capture-screen",
-    title: "SpeakWise: ✂️ Khoanh vùng quét chữ (PDF / Ảnh đang mở / Web)",
+    title: "SpeakWise: ✂️ Khoanh vùng quét chữ (PDF / Drive / Ảnh / Web)",
     contexts: ["page", "frame"]
   });
 });
@@ -34,7 +34,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       imageUrl: info.srcUrl
     });
   } else if (info.menuItemId === "speakwise-capture-screen") {
-    triggerSnippingTool(tab.id);
+    if (tab && tab.id) {
+      triggerSnippingTool(tab.id);
+    }
   }
 });
 
@@ -52,18 +54,42 @@ chrome.commands.onCommand.addListener((command) => {
   });
 });
 
-// Capture visible tab screenshot & start interactive snipping in content script
+// Capture visible tab screenshot & safely inject content script if needed
 function triggerSnippingTool(tabId) {
-  chrome.tabs.captureVisibleTab(null, { format: "png" }, (screenshotUrl) => {
-    if (chrome.runtime.lastError || !screenshotUrl) {
-      console.warn("Capture tab failed:", chrome.runtime.lastError);
-      return;
-    }
-    chrome.tabs.sendMessage(tabId, {
-      action: "start_snip_capture",
-      screenshotUrl: screenshotUrl
+  // Use a slight timeout so popup window has fully closed
+  setTimeout(() => {
+    chrome.tabs.captureVisibleTab(null, { format: "png" }, (screenshotUrl) => {
+      if (chrome.runtime.lastError || !screenshotUrl) {
+        console.warn("Capture tab failed:", chrome.runtime.lastError);
+        return;
+      }
+
+      // Try sending message first
+      chrome.tabs.sendMessage(tabId, { action: "start_snip_capture", screenshotUrl: screenshotUrl }, (res) => {
+        // If content script wasn't loaded or frame disconnected (e.g. drive/pdf/new tab)
+        if (chrome.runtime.lastError) {
+          // Programmatically inject content script into the tab
+          if (chrome.scripting) {
+            chrome.scripting.executeScript({
+              target: { tabId: tabId, allFrames: false },
+              files: ["content/content.js"]
+            }).then(() => {
+              chrome.scripting.insertCSS({
+                target: { tabId: tabId },
+                files: ["content/content.css"]
+              }).then(() => {
+                setTimeout(() => {
+                  chrome.tabs.sendMessage(tabId, { action: "start_snip_capture", screenshotUrl: screenshotUrl });
+                }, 100);
+              });
+            }).catch(err => {
+              console.error("Scripting injection failed:", err);
+            });
+          }
+        }
+      });
     });
-  });
+  }, 200);
 }
 
 // OCR Helper function using OCR Space API
@@ -149,10 +175,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
     }
   } else if (request.action === "trigger_screen_snip") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs && tabs[0] && tabs[0].id) {
-        triggerSnippingTool(tabs[0].id);
-      }
-    });
+    const targetTabId = request.tabId;
+    if (targetTabId) {
+      triggerSnippingTool(targetTabId);
+    } else {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs && tabs[0] && tabs[0].id) {
+          triggerSnippingTool(tabs[0].id);
+        }
+      });
+    }
   }
 });

@@ -81,8 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const snipBtn = document.getElementById('snip-screen-btn');
   if (snipBtn) {
     snipBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: "trigger_screen_snip" });
-      window.close(); // Close popup so user can snip the underlying webpage/PDF/image tab
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs && tabs[0] && tabs[0].id) {
+          chrome.runtime.sendMessage({ action: "trigger_screen_snip", tabId: tabs[0].id });
+          window.close(); // Close popup so user can snip the underlying webpage/PDF/image tab
+        }
+      });
     });
   }
 

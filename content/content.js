@@ -209,13 +209,15 @@
   }
 
   /* -------------------------------------------------------------
-     4. Dynamic Selection Pill & Multiple Event Listeners
+     4. Dynamic Selection Pill & Floating Side Trigger
   ------------------------------------------------------------- */
   let selectionPill = null;
   let lastSelectionData = null;
   let ocrImageButton = null;
+  let floatingSnipButton = null;
 
   function initSelectionListener() {
+    // 1. Text Selection Pill
     selectionPill = document.createElement('div');
     selectionPill.id = 'speakwise-selection-pill';
     selectionPill.innerHTML = `
@@ -225,7 +227,23 @@
     selectionPill.style.display = 'none';
     (document.body || document.documentElement).appendChild(selectionPill);
 
-    // Hover button for images to trigger OCR
+    // 2. Floating On-Screen Snip Button (Dành riêng cho PDF, Drive, Image tabs khi phím tắt bị chặn)
+    floatingSnipButton = document.createElement('div');
+    floatingSnipButton.id = 'speakwise-floating-snip-btn';
+    floatingSnipButton.title = 'Bấm để khoanh vùng quét chữ trên trang này (Alt+Q)';
+    floatingSnipButton.innerHTML = `
+      <span class="sp-float-icon">✂️</span>
+      <span class="sp-float-label">Quét PDF / Ảnh</span>
+    `;
+    (document.body || document.documentElement).appendChild(floatingSnipButton);
+
+    floatingSnipButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ action: "request_screen_snip_direct" });
+    });
+
+    // 3. Hover button for images
     ocrImageButton = document.createElement('div');
     ocrImageButton.id = 'speakwise-image-pill';
     ocrImageButton.innerHTML = `

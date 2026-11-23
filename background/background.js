@@ -57,34 +57,44 @@ chrome.commands.onCommand.addListener((command) => {
 // Capture visible tab screenshot & safely trigger snipping
 function triggerSnippingTool(tabId, delay = 0) {
   setTimeout(() => {
-    chrome.tabs.captureVisibleTab(null, { format: "png" }, (screenshotUrl) => {
-      if (chrome.runtime.lastError || !screenshotUrl) {
-        console.warn("Capture tab failed:", chrome.runtime.lastError);
-        return;
-      }
+    // If no tabId passed, get active tab
+    const getTabPromise = tabId 
+      ? Promise.resolve({ id: tabId }) 
+      : chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => tabs[0]);
 
-      // Send directly to content script
-      chrome.tabs.sendMessage(tabId, { action: "start_snip_capture", screenshotUrl: screenshotUrl }, (res) => {
-        if (chrome.runtime.lastError) {
-          // If frame was not ready, inject scripts
-          if (chrome.scripting) {
-            chrome.scripting.executeScript({
-              target: { tabId: tabId, allFrames: false },
-              files: ["content/content.js"]
-            }).then(() => {
-              chrome.scripting.insertCSS({
-                target: { tabId: tabId },
-                files: ["content/content.css"]
+    getTabPromise.then(tab => {
+      if (!tab || !tab.id) return;
+      const targetId = tab.id;
+
+      chrome.tabs.captureVisibleTab(null, { format: "png" }, (screenshotUrl) => {
+        if (chrome.runtime.lastError || !screenshotUrl) {
+          console.warn("Capture tab failed:", chrome.runtime.lastError ? chrome.runtime.lastError.message : "No URL");
+          return;
+        }
+
+        // Try direct message
+        chrome.tabs.sendMessage(targetId, { action: "start_snip_capture", screenshotUrl: screenshotUrl }, (res) => {
+          if (chrome.runtime.lastError) {
+            // Content script not yet present, inject dynamically via scripting
+            if (chrome.scripting) {
+              chrome.scripting.executeScript({
+                target: { tabId: targetId },
+                files: ["content/content.js"]
+              }).then(() => {
+                return chrome.scripting.insertCSS({
+                  target: { tabId: targetId },
+                  files: ["content/content.css"]
+                });
               }).then(() => {
                 setTimeout(() => {
-                  chrome.tabs.sendMessage(tabId, { action: "start_snip_capture", screenshotUrl: screenshotUrl });
-                }, 80);
+                  chrome.tabs.sendMessage(targetId, { action: "start_snip_capture", screenshotUrl: screenshotUrl });
+                }, 100);
+              }).catch(err => {
+                console.error("Scripting injection failed:", err);
               });
-            }).catch(err => {
-              console.error("Scripting injection failed:", err);
-            });
+            }
           }
-        }
+        });
       });
     });
   }, delay);

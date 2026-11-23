@@ -1,13 +1,16 @@
 {
   "manifest_version": 3,
   "name": "SpeakWise - Pronunciation & Vocabulary Coach",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Learn pronunciation, vocabulary, IPA phonetics, definitions, crop/snip screen OCR for images/PDFs, and practice speaking with speech recognition scoring.",
   "permissions": [
     "storage",
     "contextMenus",
     "activeTab",
     "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "commands": {
     "speakwise-read-selection": {

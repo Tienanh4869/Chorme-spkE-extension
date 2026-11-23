@@ -1135,7 +1135,39 @@
   }
 
   /* -------------------------------------------------------------
-     13. Keyboard Shortcuts & Background Listeners
+     13. In-Page Keyboard Shortcuts (Alt+Q, Alt+S, Alt+W directly)
+  ------------------------------------------------------------- */
+  document.addEventListener('keydown', (e) => {
+    // Alt + Q directly in page
+    if (e.altKey && (e.key === 'q' || e.key === 'Q' || e.code === 'KeyQ')) {
+      e.preventDefault();
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ action: "request_screen_snip_direct" });
+    }
+    // Alt + S directly in page
+    else if (e.altKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
+      const selData = getActiveSelectionData();
+      const textToRead = selData.text || window.getSelection().toString().trim();
+      if (textToRead) {
+        e.preventDefault();
+        playPronunciation(textToRead, 1.0);
+      }
+    }
+    // Alt + W directly in page
+    else if (e.altKey && (e.key === 'w' || e.key === 'W' || e.code === 'KeyW')) {
+      e.preventDefault();
+      if (activeSidePanel && activeSidePanel.classList.contains('visible')) {
+        closeSidePanel();
+      } else {
+        const selData = getActiveSelectionData();
+        const selText = selData.text || window.getSelection().toString().trim();
+        openSidePanel(selText || 'Hello', '');
+      }
+    }
+  }, true);
+
+  /* -------------------------------------------------------------
+     14. Background Listeners
   ------------------------------------------------------------- */
   chrome.runtime.onMessage.addListener((req) => {
     if (req.action === "open_modal" && req.text) {

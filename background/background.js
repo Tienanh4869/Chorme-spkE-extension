@@ -185,5 +185,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       });
     }
+  } else if (request.action === "request_screen_snip_direct") {
+    const senderTabId = (sender && sender.tab && sender.tab.id);
+    if (senderTabId) {
+      triggerSnippingTool(senderTabId);
+    } else {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs && tabs[0] && tabs[0].id) {
+          triggerSnippingTool(tabs[0].id);
+        }
+      });
+    }
   }
 });

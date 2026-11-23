@@ -54,9 +54,8 @@ chrome.commands.onCommand.addListener((command) => {
   });
 });
 
-// Capture visible tab screenshot & safely inject content script if needed
-function triggerSnippingTool(tabId) {
-  // Use a slight timeout so popup window has fully closed
+// Capture visible tab screenshot & safely trigger snipping
+function triggerSnippingTool(tabId, delay = 0) {
   setTimeout(() => {
     chrome.tabs.captureVisibleTab(null, { format: "png" }, (screenshotUrl) => {
       if (chrome.runtime.lastError || !screenshotUrl) {
@@ -64,11 +63,10 @@ function triggerSnippingTool(tabId) {
         return;
       }
 
-      // Try sending message first
+      // Send directly to content script
       chrome.tabs.sendMessage(tabId, { action: "start_snip_capture", screenshotUrl: screenshotUrl }, (res) => {
-        // If content script wasn't loaded or frame disconnected (e.g. drive/pdf/new tab)
         if (chrome.runtime.lastError) {
-          // Programmatically inject content script into the tab
+          // If frame was not ready, inject scripts
           if (chrome.scripting) {
             chrome.scripting.executeScript({
               target: { tabId: tabId, allFrames: false },
@@ -80,7 +78,7 @@ function triggerSnippingTool(tabId) {
               }).then(() => {
                 setTimeout(() => {
                   chrome.tabs.sendMessage(tabId, { action: "start_snip_capture", screenshotUrl: screenshotUrl });
-                }, 100);
+                }, 80);
               });
             }).catch(err => {
               console.error("Scripting injection failed:", err);
@@ -89,7 +87,7 @@ function triggerSnippingTool(tabId) {
         }
       });
     });
-  }, 200);
+  }, delay);
 }
 
 // OCR Helper function using OCR Space API
@@ -177,22 +175,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "trigger_screen_snip") {
     const targetTabId = request.tabId;
     if (targetTabId) {
-      triggerSnippingTool(targetTabId);
+      triggerSnippingTool(targetTabId, 150);
     } else {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs && tabs[0] && tabs[0].id) {
-          triggerSnippingTool(tabs[0].id);
+          triggerSnippingTool(tabs[0].id, 150);
         }
       });
     }
   } else if (request.action === "request_screen_snip_direct") {
     const senderTabId = (sender && sender.tab && sender.tab.id);
     if (senderTabId) {
-      triggerSnippingTool(senderTabId);
+      triggerSnippingTool(senderTabId, 0);
     } else {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs && tabs[0] && tabs[0].id) {
-          triggerSnippingTool(tabs[0].id);
+          triggerSnippingTool(tabs[0].id, 0);
         }
       });
     }

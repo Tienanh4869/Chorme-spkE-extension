@@ -495,28 +495,6 @@
     }
   }
 
-      if (res.smartGuessNote) {
-        guessEl.style.display = 'block';
-        guessEl.innerHTML = res.smartGuessNote;
-      }
-
-      if (!isSentenceMode && res.dictEntries && res.dictEntries.length > 0) {
-        subsEl.style.display = 'block';
-        let html = '';
-        res.dictEntries.slice(0, 2).forEach(item => {
-          const posMap = { noun: 'Danh từ', verb: 'Động từ', adjective: 'Tính từ', adverb: 'Trạng từ' };
-          const posTitle = posMap[item.pos] || item.pos;
-          html += `<div class="sp-vn-pos-line"><span class="sp-vn-pos-badge">${posTitle}</span> ${item.meanings.slice(0, 4).join(', ')}</div>`;
-        });
-        subsEl.innerHTML = html;
-      }
-    });
-
-    if (!isSentenceMode) {
-      fetchEnglishExtras(cleanText, 'tip');
-    }
-  }
-
   function removeInlineTooltip() {
     if (activeTooltip) {
       activeTooltip.remove();

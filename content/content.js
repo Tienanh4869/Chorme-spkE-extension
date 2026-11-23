@@ -332,9 +332,9 @@
   }
 
   /* -------------------------------------------------------------
-     5. Inline Floating Tooltip with Boundary Detection
+     5. Inline Floating Tooltip with Boundary & Position Optimization
   ------------------------------------------------------------- */
-  function showInlineTooltip(rawText, context, targetRect) {
+  function showInlineTooltip(rawText, context, targetRect, isOcrResult = false) {
     removeInlineTooltip();
     const cleanText = rawText.trim();
     currentTargetText = cleanText;
@@ -350,12 +350,16 @@
     }
 
     const tipWidth = isSentenceMode ? 430 : 350;
-    const tipEstimatedHeight = 280;
+    const tipEstimatedHeight = 300;
 
     const baseLeft = targetRect ? targetRect.left : 100;
     const baseTop = targetRect ? targetRect.bottom : 100;
 
     let leftPos = window.scrollX + baseLeft;
+    // Align center if target width is larger
+    if (targetRect && targetRect.width > tipWidth) {
+      leftPos = window.scrollX + targetRect.left + (targetRect.width - tipWidth) / 2;
+    }
     if (leftPos + tipWidth > window.scrollX + window.innerWidth - 15) {
       leftPos = window.scrollX + window.innerWidth - tipWidth - 15;
     }
@@ -363,19 +367,22 @@
       leftPos = window.scrollX + 10;
     }
 
-    let topPos = window.scrollY + baseTop + 8;
-    if (targetRect && targetRect.bottom + tipEstimatedHeight > window.innerHeight && targetRect.top > tipEstimatedHeight) {
-      topPos = window.scrollY + targetRect.top - tipEstimatedHeight - 8;
+    let topPos = window.scrollY + baseTop + 10;
+    // If tooltip overflows viewport bottom, flip above
+    if (targetRect && (targetRect.bottom + tipEstimatedHeight > window.innerHeight) && (targetRect.top > tipEstimatedHeight)) {
+      topPos = window.scrollY + targetRect.top - tipEstimatedHeight - 12;
     }
 
     activeTooltip.style.top = `${topPos}px`;
     activeTooltip.style.left = `${leftPos}px`;
 
+    const badgeLabel = isOcrResult ? '📷 Chữ từ ảnh/PDF' : (isSentenceMode ? '✨ Dịch Ngữ Cảnh' : '📖 Từ vựng');
+
     activeTooltip.innerHTML = `
       <div class="sp-card">
         <div class="sp-card-header">
           <div class="sp-word-group">
-            <span class="sp-badge-type">${isSentenceMode ? '✨ Dịch Ngữ Cảnh' : '📖 Từ vựng'}</span>
+            <span class="sp-badge-type ${isOcrResult ? 'ocr' : ''}">${badgeLabel}</span>
             ${!isSentenceMode ? `<span class="sp-target-word">${cleanText}</span><span class="sp-ipa" id="sp-tip-ipa">...</span>` : ''}
           </div>
           <div class="sp-header-actions">
@@ -389,7 +396,7 @@
         <!-- Nghĩa Tiếng Việt & Suy Luận Ngữ Cảnh -->
         <div class="sp-vn-meaning-box">
           <div class="sp-vn-label">
-            <span>🇻🇳 <strong>Nghĩa Chuẩn Ngữ Cảnh:</strong></span>
+            <span>🇻🇳 <strong>Nghĩa Tiếng Việt:</strong></span>
           </div>
           <div class="sp-vn-primary" id="sp-tip-vn-primary">
             <div class="sp-loading-spinner"></div>
@@ -447,6 +454,28 @@
       const subsEl = document.getElementById('sp-tip-vn-subs');
 
       if (primaryEl) primaryEl.textContent = res.translation;
+
+      if (res.smartGuessNote) {
+        guessEl.style.display = 'block';
+        guessEl.innerHTML = res.smartGuessNote;
+      }
+
+      if (!isSentenceMode && res.dictEntries && res.dictEntries.length > 0) {
+        subsEl.style.display = 'block';
+        let html = '';
+        res.dictEntries.slice(0, 2).forEach(item => {
+          const posMap = { noun: 'Danh từ', verb: 'Động từ', adjective: 'Tính từ', adverb: 'Trạng từ' };
+          const posTitle = posMap[item.pos] || item.pos;
+          html += `<div class="sp-vn-pos-line"><span class="sp-vn-pos-badge">${posTitle}</span> ${item.meanings.slice(0, 4).join(', ')}</div>`;
+        });
+        subsEl.innerHTML = html;
+      }
+    });
+
+    if (!isSentenceMode) {
+      fetchEnglishExtras(cleanText, 'tip');
+    }
+  }
 
       if (res.smartGuessNote) {
         guessEl.style.display = 'block';
@@ -934,7 +963,7 @@
     const rect = imgEl ? imgEl.getBoundingClientRect() : { left: window.innerWidth / 2 - 100, top: 100, bottom: 120, width: 200, height: 100 };
 
     // Show inline loading state
-    showInlineTooltip('Đang quét chữ trong hình ảnh...', '', rect);
+    showInlineTooltip('Đang quét chữ...', '', rect, true);
     const primaryEl = document.getElementById('sp-tip-vn-primary');
     if (primaryEl) primaryEl.innerHTML = '<div class="sp-loading-spinner"></div> Đang nhận diện ký tự & câu văn qua OCR...';
 
@@ -958,7 +987,7 @@
 
     chrome.runtime.sendMessage(payload, (response) => {
       if (response && response.success && response.text) {
-        showInlineTooltip(response.text, '', rect);
+        showInlineTooltip(response.text, '', rect, true);
       } else {
         const err = (response && response.error) || 'Không thể quét chữ từ ảnh này.';
         if (primaryEl) {
@@ -1086,14 +1115,14 @@
         height: height
       };
 
-      // Show inline tooltip with loading
-      showInlineTooltip('Đang quét chữ trong vùng chọn...', '', targetRect);
+      // Show inline tooltip with loading modal
+      showInlineTooltip('Đang quét chữ...', '', targetRect, true);
       const primaryEl = document.getElementById('sp-tip-vn-primary');
-      if (primaryEl) primaryEl.innerHTML = '<div class="sp-loading-spinner"></div> Đang nhận diện câu/chữ qua OCR...';
+      if (primaryEl) primaryEl.innerHTML = '<div class="sp-loading-spinner"></div> Đang nhận diện chữ & phát âm qua OCR...';
 
       chrome.runtime.sendMessage({ action: "perform_ocr", dataUrl: croppedDataUrl }, (res) => {
         if (res && res.success && res.text) {
-          showInlineTooltip(res.text, '', targetRect);
+          showInlineTooltip(res.text, '', targetRect, true);
         } else {
           const err = (res && res.error) || 'Không tìm thấy chữ hoặc câu nào trong vùng vừa chọn.';
           if (primaryEl) {

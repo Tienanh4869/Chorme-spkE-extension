@@ -152,6 +152,12 @@
   border-radius: 10px;
 }
 
+.sp-badge-type.ocr {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
 .sp-target-word {
   font-size: 17px;
   font-weight: 700;
